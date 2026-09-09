@@ -10,7 +10,10 @@ and which reachable route is cheapest for the same model right now.
 [![stars](https://img.shields.io/github/stars/vitas/dsh-model-pricing?style=social)](https://github.com/vitas/dsh-model-pricing)
 [![dsh plugin](https://img.shields.io/badge/dsh--plugin-ready-informational)](https://github.com/deepseek-ai/deepseek-harness)
 
-<!-- Preview: assets/screenshot.png (drop the image in and it renders here) -->
+![dsh-model-pricing pricing table rendered in the DSH Models settings page](assets/screenshot.png)
+
+*The pricing table in the DSH **Settings → Models** page: cross-provider `cheapest`
+badges, capability tags, and per-1M-token prices.*
 
 ## Why
 
