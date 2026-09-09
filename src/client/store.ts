@@ -6,7 +6,7 @@
 
 import type { PricingPayload, PricingRow } from './types.js'
 
-export type LoadStatus = 'idle' | 'loading' | 'live' | 'cached' | 'embedded' | 'error'
+export type LoadStatus = 'idle' | 'loading' | 'live' | 'cached' | 'embedded' | 'absent' | 'error'
 
 export interface Filters {
   query: string
@@ -56,33 +56,50 @@ export function createStore(fallback: PricingPayload | null) {
     emit()
   }
 
+  /**
+   * Fetch the host snapshot. A 404 means the host half is not mounted at all
+   * (DSH's web server answers unknown paths with 404) — per MVP DoD #5 the
+   * section then renders nothing. Every other failure (offline, 5xx) is an
+   * upstream problem and takes the fallback path.
+   */
+  async function fetchSnapshot(url: string, init?: RequestInit): Promise<{ payload?: PricingPayload; absent?: boolean }> {
+    const response = await fetch(url, { headers: { accept: 'application/json' }, cache: 'no-cache', ...init })
+    if (response.status === 404) return { absent: true }
+    if (!response.ok) throw new Error(`status ${String(response.status)}`)
+    const payload = (await response.json()) as PricingPayload
+    if (!Array.isArray(payload.rows)) throw new Error('unexpected payload shape')
+    return { payload }
+  }
+
+  function useFallback(error: unknown) {
+    if (fallback?.rows) {
+      set({
+        status: 'embedded',
+        payload: fallback,
+        ageMs: Date.now() - Date.parse(fallback.generatedAt),
+        error: String((error as Error)?.message ?? error),
+      })
+    } else {
+      set({ status: 'error', error: String((error as Error)?.message ?? error) })
+    }
+  }
+
   async function load(force = false) {
     const seq = ++loadSeq
     set({ status: 'loading', error: undefined })
     try {
       const url = force ? '/model-pricing/snapshot?fresh=1' : '/model-pricing/snapshot'
-      const response = await fetch(url, { headers: { accept: 'application/json' }, cache: 'no-cache' })
-      if (!response.ok) throw new Error(`status ${String(response.status)}`)
-      const payload = (await response.json()) as PricingPayload
-      if (!Array.isArray(payload.rows)) throw new Error('unexpected payload shape')
+      const { payload, absent } = await fetchSnapshot(url)
       if (seq !== loadSeq) return
+      if (absent) return set({ status: 'absent', payload: undefined })
       set({
-        status: payload.fromCache ? 'cached' : 'live',
+        status: payload!.fromCache ? 'cached' : 'live',
         payload,
-        ageMs: Date.now() - Date.parse(payload.generatedAt),
+        ageMs: Date.now() - Date.parse(payload!.generatedAt),
       })
     } catch (error) {
       if (seq !== loadSeq) return
-      if (fallback?.rows) {
-        set({
-          status: 'embedded',
-          payload: fallback,
-          ageMs: Date.now() - Date.parse(fallback.generatedAt),
-          error: String((error as Error)?.message ?? error),
-        })
-      } else {
-        set({ status: 'error', error: String((error as Error)?.message ?? error) })
-      }
+      useFallback(error)
     }
   }
 
@@ -90,14 +107,13 @@ export function createStore(fallback: PricingPayload | null) {
     const seq = ++loadSeq
     set({ status: 'loading', error: undefined })
     try {
-      const response = await fetch('/model-pricing/refresh', { method: 'POST' })
-      if (!response.ok) throw new Error(`status ${String(response.status)}`)
-      const payload = (await response.json()) as PricingPayload
+      const { payload, absent } = await fetchSnapshot('/model-pricing/refresh', { method: 'POST' })
       if (seq !== loadSeq) return
-      set({ status: 'live', payload, ageMs: Date.now() - Date.parse(payload.generatedAt) })
+      if (absent) return set({ status: 'absent', payload: undefined })
+      set({ status: 'live', payload, ageMs: Date.now() - Date.parse(payload!.generatedAt) })
     } catch (error) {
       if (seq !== loadSeq) return
-      set({ status: state.payload ? state.status : 'error', error: String((error as Error)?.message ?? error) })
+      useFallback(error)
     }
   }
 
@@ -144,6 +160,11 @@ export function createStore(fallback: PricingPayload | null) {
     setFilters,
     setCollapsed(collapsed: boolean) {
       set({ collapsed })
+    },
+    /** Force a re-render without changing state (locale switch). */
+    notify() {
+      state = { ...state }
+      emit()
     },
     load,
     refresh,

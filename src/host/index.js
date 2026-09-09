@@ -11,6 +11,9 @@
 
 import { createHash } from 'node:crypto'
 import { gzipSync } from 'node:zlib'
+import { readFileSync, writeFileSync, mkdirSync } from 'node:fs'
+import { homedir, tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { DEFAULT_SOURCE_URL, annotateComparisons, fetchModelsDev, pruneModelsDev } from './catalog.js'
 
 
@@ -154,17 +157,52 @@ export async function apply(ctx, config = {}) {
     return snapshot === null || Date.now() - snapshot.fetchedAt > ttlMs
   }
 
+  /** Disk cache location: under DSH_HOME when set, else `~/.dsh`, else temp. */
+  function cacheFile() {
+    const base = process.env.DSH_HOME || join(homedir(), '.dsh')
+    return join(base, 'plugin-storage', PLUGIN_ID, 'catalog.json')
+  }
+
+  /** Last good snapshot survives restarts so an offline start serves real data. */
+  function persist(snap) {
+    try {
+      const file = cacheFile()
+      mkdirSync(join(file, '..'), { recursive: true })
+      writeFileSync(file, JSON.stringify({ savedAt: snap.fetchedAt, payload: snap.payload }))
+    } catch (error) {
+      ctx.logger?.debug?.(`${PLUGIN_ID}: cache write skipped: ${String(error?.message ?? error)}`)
+    }
+  }
+
+  function loadPersisted() {
+    try {
+      const raw = readFileSync(cacheFile(), 'utf8')
+      const { savedAt, payload } = JSON.parse(raw)
+      if (!payload || !Array.isArray(payload.rows)) return null
+      const fetchedAt = Number(savedAt) || 0
+      return { payload, etag: etagOf(payload), fetchedAt, fromCache: true }
+    } catch {
+      return null
+    }
+  }
+
   async function current(force) {
     if (!force && !stale() && snapshot) return snapshot
     if (inflight) return inflight
     inflight = build()
       .then((next) => {
         snapshot = next
+        persist(next)
         return next
       })
       .catch((error) => {
         ctx.logger?.warn?.(`${PLUGIN_ID}: catalog refresh failed: ${String(error?.message ?? error)}`)
-        if (snapshot) return { ...snapshot, fromCache: true } // serve last good
+        if (snapshot) return { ...snapshot, fromCache: true } // serve last good (memory)
+        const persisted = loadPersisted() // cold start, offline: serve disk cache
+        if (persisted) {
+          snapshot = persisted
+          return persisted
+        }
         throw error
       })
       .finally(() => {
@@ -232,6 +270,18 @@ export async function apply(ctx, config = {}) {
   // Register only once webServer is mounted in this composition; in headless/SDK
   // compositions the injected fiber simply waits and never fires.
   ctx.inject(['webServer'], register)
+
+  // MVP DoD #3: provider-topology changes re-evaluate the "Only mine" view. The
+  // catalog itself is unaffected; only the configured-providers stamp is rebuilt,
+  // which changes the payload (and its etag), so clients refetch on demand.
+  ctx.inject(['llm'], (c) => {
+    const off = c.on('llm/adapters-updated', () => {
+      if (!snapshot) return
+      const payload = { ...snapshot.payload, providers: { ...snapshot.payload.providers, configured: configuredProviders() } }
+      snapshot = { ...snapshot, payload, etag: etagOf(payload) }
+    })
+    return () => off?.()
+  })
 
   // Warm the cache off the activation path; never fatal.
   ctx.effect(() => {
