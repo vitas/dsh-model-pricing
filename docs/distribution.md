@@ -30,18 +30,22 @@ below were verified against the live ecosystem on 2026-09-09; anything marked
    name: vitas/dsh-model-pricing
    category: model
    description:
-     en: 'Per-1M-token pricing, capability tags, and live cross-provider comparison for every model you can connect, in the DSH settings page.'
+     en: 'Model pricing for the DSH settings page: per-1M-token prices from models.dev with the harness catalog overlaid, capability tags, cross-provider comparison, and a community promotion feed.'
+     zh: 'DSH 设置页中的模型价格表：基于 models.dev 的每 100 万 token 价格并叠加本地目录，含能力标签、跨供应商比价和社区促销信息源。'
    ```
 
-   (`description.en` must end with a period; quote it because it contains ": ".)
+   (`description.en` must end with a period; quote it because it contains ": ".
+   Post texts for every channel, and the exact submission commands, live in
+   `docs/announcements.md`.)
    Listing requirements: installs through `dsh plugin add` (a `dsh.bundle`
    manifest is what makes that possible), accurate one-line description,
    reasonable category, maintained repo. The correct category is `model`
    (*Models & Providers*), which already holds catalog tools like
    `dsh-model-info-fill` and `dsh-model-manager`. CI checks manifest shape and
-   **repository age**, and a maintainer reads the target repo before merging — so
-   submit a few days after the repo is public with its docs, README, and first
-   release in place, not on day zero.
+   **repository age** (>= 1 day, automatic), and a maintainer reads the target repo
+   before merging — so submit after the gate with docs, README, npm package and
+   first release already in place, and keep the description exactly as checkable
+   claims (numbers there must match the code).
 3. **dsh-market** (`dsh plugin --profile web add dshmarket`) — an in-app plugin
    browser embedded in DSH Settings; the awesome list advertises it as carrying
    "every plugin on this list", so market presence follows from (2) rather than a

@@ -2,8 +2,12 @@
 # Open a PR that adds this file to the list repo as:
 #   data/plugins/vitas__dsh-model-pricing.yml
 # (READMEs in that repo are generated from data/plugins/*.yml — do not edit them.)
+# Submission gate: the list's CI requires the target repo to be >= 1 day old;
+# vitas/dsh-model-pricing was created 2026-09-09T16:36Z, so submit from
+# 2026-09-10T17:00Z onward.
 url: https://github.com/vitas/dsh-model-pricing
 name: vitas/dsh-model-pricing
 category: model
 description:
-  en: 'Per-1M-token pricing, capability tags, and live cross-provider comparison for every model you can connect, in the DSH settings page.'
+  en: 'Model pricing for the DSH settings page: per-1M-token prices from models.dev with the harness catalog overlaid, capability tags, cross-provider comparison, and a community promotion feed.'
+  zh: 'DSH 设置页中的模型价格表：基于 models.dev 的每 100 万 token 价格并叠加本地目录，含能力标签、跨供应商比价和社区促销信息源。'
