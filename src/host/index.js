@@ -10,6 +10,7 @@
  */
 
 import { createHash } from 'node:crypto'
+import { gzipSync } from 'node:zlib'
 import { DEFAULT_SOURCE_URL, fetchModelsDev, pruneModelsDev } from './catalog.js'
 
 
@@ -171,22 +172,29 @@ export async function apply(ctx, config = {}) {
     return inflight
   }
 
-  function sendJson(res, status, body, etag) {
+  /** Memoized gzip per etag: the catalog is refreshed rarely but read per load. */
+  const gzipCache = { etag: null, buf: null }
+  function sendJson(res, status, body, etag, req) {
     const headers = { 'content-type': 'application/json; charset=utf-8' }
     if (etag) headers.etag = etag
+    const wantsGzip = /\bgzip\b/.test(String(req?.headers?.['accept-encoding'] ?? ''))
+    if (wantsGzip && body && body.length > 1024) {
+      if (gzipCache.etag !== etag) {
+        gzipCache.etag = etag
+        gzipCache.buf = gzipSync(Buffer.from(body))
+      }
+      headers['content-encoding'] = 'gzip'
+      headers['vary'] = 'accept-encoding'
+      res.writeHead(status, headers)
+      res.end(status === 304 ? '' : gzipCache.buf)
+      return
+    }
     res.writeHead(status, headers)
     res.end(body)
   }
 
-  function register() {
-    // Reading an unmounted service through the ctx proxy is guarded: the route
-    // surface exists only in browser-facing compositions.
-    let webServer
-    try {
-      webServer = ctx.webServer
-    } catch {
-      return
-    }
+  function register(c) {
+    const webServer = c.webServer
     if (!webServer?.register) return
     const disposeSnapshot = webServer.register({
       kind: 'exact',
@@ -194,10 +202,10 @@ export async function apply(ctx, config = {}) {
       handler: async (req, res) => {
         try {
           const snap = await current(false)
-          if (req.headers['if-none-match'] === snap.etag) return sendJson(res, 304, '')
-          sendJson(res, 200, JSON.stringify({ ...snap.payload, fromCache: snap.fromCache }), snap.etag)
+          if (req.headers['if-none-match'] === snap.etag) return sendJson(res, 304, '', snap.etag, req)
+          sendJson(res, 200, JSON.stringify({ ...snap.payload, fromCache: snap.fromCache }), snap.etag, req)
         } catch (error) {
-          sendJson(res, 503, JSON.stringify({ error: 'catalog_unavailable', detail: String(error?.message ?? error) }))
+          sendJson(res, 503, JSON.stringify({ error: 'catalog_unavailable', detail: String(error?.message ?? error) }), undefined, req)
         }
       },
     })
@@ -214,15 +222,15 @@ export async function apply(ctx, config = {}) {
         }
       },
     })
-    ctx.effect(() => () => {
+    c.effect(() => () => {
       disposeSnapshot?.()
       disposeRefresh?.()
     })
   }
 
-  // webServer is only mounted in browser-facing compositions; when present, the ctx
-  // proxy resolves it synchronously. Headless/SDK profiles skip the route cleanly.
-  register()
+  // Register only once webServer is mounted in this composition; in headless/SDK
+  // compositions the injected fiber simply waits and never fires.
+  ctx.inject(['webServer'], register)
 
   // Warm the cache off the activation path; never fatal.
   ctx.effect(() => {
