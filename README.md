@@ -28,7 +28,7 @@ capability metadata), merged host-side with TTL caching and offline fallback.
 | Doc | Purpose |
 |-----|---------|
 | [docs/feature-map.md](docs/feature-map.md) | Feature spec & map (RU): epics, IDs, DoD, risks, open questions |
-| docs/architecture.md | next: transport, package layout, data flow |
+| [docs/architecture.md](docs/architecture.md) | Transport, package layout, data model, CI, spikes (RU) |
 | docs/design.md | next: UX of the pricing section |
 
 ## Install (will be)
