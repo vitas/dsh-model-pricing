@@ -1,53 +1,100 @@
 # dsh-model-pricing
 
-A [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (DSH) plugin that
-shows model prices and capabilities inside the DSH web client.
+**Compare LLM API prices before you pick a model.** A plugin for
+[DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (DSH) that puts a
+**model pricing and capability table** directly into your DSH settings: per-1M-token
+input/output/cache prices, context window, coding/agentic/vision/long-context tags,
+and which reachable route is cheapest for the same model right now.
 
-For every model you can connect to DSH, the plugin displays **prices per 1M tokens**,
-**capability tags** (coding, agentic, vision, long context, open weights), and
-**which reachable route is cheapest right now**, including curated promotions. The
-pricing view mounts into the existing **Models settings page** through DSH's public
-extension slots (`settings.models.footer` and `settings.models.provider-card`).
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
+[![stars](https://img.shields.io/github/stars/vitas/dsh-model-pricing?style=social)](https://github.com/vitas/dsh-model-pricing)
+[![dsh plugin](https://img.shields.io/badge/dsh--plugin-ready-informational)](https://github.com/deepseek-ai/deepseek-harness)
 
-## Features (planned)
+<!-- Preview: assets/screenshot.png (drop the image in and it renders here) -->
 
-- Pricing table of all connectable models: provider · model · input / output /
-  cache-read price per 1M · context window · capability tags
-- Automatic cross-provider comparison for the same model (`−N% vs …`, `cheapest`)
-- Flat-rate subscription ("coding plan") providers shown as a separate group
-- Curated promotions feed with expiry tracking, contributed through pull requests
-- Price badges inside each provider card on the Models page
-- A `/pricing` command and an approximate "this session ≈ $N" estimate (later milestones)
+## Why
 
-Data sources: the `pi-ai` model catalog already bundled with DSH (authoritative for
-routes the user can actually invoke) and [`models.dev`](https://models.dev) (213
-providers with costs and capability metadata), merged on the plugin's host side with
-TTL caching and an embedded offline fallback. All figures are labeled estimates, not
-billing data.
+Choosing a coding agent model today means opening three browser tabs: your provider's
+price page, a comparison site, and someone's spreadsheet of which API is discounting
+this month. `dsh-model-pricing` collapses that into the harness you are already in:
+one table, filtered to what you can actually call, refreshed from public catalogs on
+your own machine.
 
-## Status
+## Features
 
-Pre-implementation. Design documents:
+- **Pricing table** for every connectable model — input / output / cache-read price
+  per 1M tokens, context window, and max output (213 providers, ~7,200 priced models)
+- **Capability tags** computed from structured catalog fields: Coding, Agentic,
+  Vision, Long context, Open weights, Structured output — with user-configurable rules
+- **Authoritative routing prices**: for models DSH can actually invoke, the harness's
+  own bundled `pi-ai` catalog overrides the public catalog, and price divergences
+  larger than 10% are flagged row by row
+- **Automatic cross-provider comparison** for the same model (`−N% vs …`, `cheapest`)
+- **Promotion feed** with expiry tracking, contributed as reviewed pull requests
+- **Badges inside provider cards** on the Models settings page
+- **`/pricing` command** and approximate per-session cost (planned)
+
+## Install
+
+From source (works today):
+
+```sh
+git clone https://github.com/vitas/dsh-model-pricing.git
+cd dsh-model-pricing
+npm install && npm run snapshot && npm run build
+dsh plugin --profile web add .
+```
+
+After publishing to npm:
+
+```sh
+dsh plugin --profile web add dsh-model-pricing
+```
+
+Either way, restart `dsh web` and open **Settings → Models**: the pricing table
+appears at the bottom of the page.
+
+## Privacy and data sources
+
+The plugin runs entirely on your machine; it operates no server of its own. Its
+outbound traffic is an anonymous read of public catalog data:
+
+- [`models.dev`](https://models.dev) — 213 providers with per-model costs and
+  capability metadata
+- the `@earendil-works/pi-ai` model catalog already bundled with DSH — authoritative
+  for the routes you can invoke
+- the promotion feed served as static JSON from this repository
+
+Every displayed price is labeled with its source and freshness. Prices are estimates
+for model selection, not billing data — your provider's invoice is the only authority.
+
+## Documentation
 
 | Document | Contents |
 |----------|----------|
 | [docs/feature-map.md](docs/feature-map.md) | Feature specification: scenarios, epics, MVP definition of done, risks, recorded decisions |
 | [docs/architecture.md](docs/architecture.md) | System architecture: deployment model, transport, data model, packaging, CI, milestones |
 | [docs/design.md](docs/design.md) | UX design of the pricing section: layout, states, badge vocabulary, tokens, accessibility |
+| [docs/distribution.md](docs/distribution.md) | How the plugin is published, discovered, and maintained in the DSH ecosystem |
 | [spike/RESULTS.md](spike/RESULTS.md) | Platform-validation evidence for the architectural assumptions |
 
-## Planned installation
+## Contributing
 
-```sh
-dsh plugin --profile web add dsh-model-pricing
-```
+Wrong price? Missing promotion? [Open an issue](https://github.com/vitas/dsh-model-pricing/issues/new/choose)
+using the structured forms, or send a pull request to `promos/**` — every entry needs
+a source URL and an expiry. Code contributions should follow
+[docs/architecture.md](docs/architecture.md) (package layout, CI expectations).
 
-The plugin runs entirely on the user's machine; it operates no server of its own. Its
-only outbound traffic is anonymous reads of public data sources; the promotion feed is
-served as static files from this repository.
+This plugin is listed in
+[awesome-dsh-plugin](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin) *(submission
+in progress)* and installable alongside the other community plugins through
+`dsh plugin add`.
+
+If this saved you a tab-switch, **[a star](https://github.com/vitas/dsh-model-pricing)
+helps other people find it.**
 
 ## License
 
 Apache-2.0. Pricing and capability data are retrieved at runtime from
-[models.dev](https://models.dev) and from the bundled `@earendil-works/pi-ai` catalog;
-the source and freshness of every displayed price are attributed in the UI.
+[models.dev](https://models.dev) and the bundled `@earendil-works/pi-ai` catalog;
+source and freshness are attributed per row in the UI.

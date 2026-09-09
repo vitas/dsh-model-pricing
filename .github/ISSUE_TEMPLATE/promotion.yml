@@ -1,0 +1,49 @@
+name: Submit a promotion
+description: Report a current discount, free tier, or coding-plan price so it can enter the promo feed
+title: "[promo] <provider>: <short headline>"
+labels: [promotions]
+body:
+  - type: markdown
+    attributes:
+      value: >
+        Promotions become a `promos/<provider>.json` file reviewed by CI and shown
+        as a badge with an expiry countdown. Every entry needs a public source and
+        an expiry. Keep one model (or one plan) per issue.
+  - type: input
+    id: provider
+    attributes:
+      label: Provider id
+      description: The models.dev / catalog provider id, e.g. `moonshot`, `zhipu`, `b.ai`.
+      placeholder: moonshot
+    validations:
+      required: true
+  - type: input
+    id: model
+    attributes:
+      label: Model id (or "all" for a provider-wide plan)
+      placeholder: kimi-k2
+    validations:
+      required: true
+  - type: textarea
+    id: promo
+    attributes:
+      label: What the promotion is
+      description: One line, e.g. "50% off output tokens" or "free coding plan, rate-limited".
+      placeholder: 50% off output until 2026-10-01
+    validations:
+      required: true
+  - type: input
+    id: url
+    attributes:
+      label: Source URL
+      description: A public page (official announcement or pricing page) that shows the promo.
+      placeholder: https://example.com/pricing
+    validations:
+      required: true
+  - type: input
+    id: expires
+    attributes:
+      label: Expiry date (YYYY-MM-DD) or "rolling"
+      placeholder: "2026-10-01"
+    validations:
+      required: true

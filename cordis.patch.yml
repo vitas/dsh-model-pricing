@@ -1,0 +1,10 @@
+# dsh-model-pricing bundle patch: mounts the pricing catalog into a profile's
+# layer stack when the package is added with `dsh plugin --profile <name> add
+# dsh-model-pricing`. The host half registers the /model-pricing routes; the
+# browser half is discovered through the package's `dsh.client` manifest and
+# mounts the pricing table into the Models settings page.
+- insert:
+    - id: dsh-model-pricing
+      # Node-resolvable package name — must stay in sync with package.json
+      # `name`. Quoted because `@` is a reserved YAML indicator.
+      name: 'dsh-model-pricing'

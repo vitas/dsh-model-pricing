@@ -1,21 +1,28 @@
 {
   "name": "dsh-model-pricing",
   "version": "0.1.0",
-  "description": "Model pricing and capabilities board for DeepSeek Harness, mounted into the Models settings page",
+  "description": "Model pricing and capability board for DeepSeek Harness: compare per-1M-token prices, find the cheapest route, and see coding/agentic/vision tags for every LLM you can connect \u2014 in the DSH settings UI.",
   "type": "module",
   "license": "Apache-2.0",
   "main": "./src/host/index.js",
   "exports": {
     ".": "./src/host/index.js",
     "./client": "./lib/client.js",
+    "./cordis.patch.yml": "./cordis.patch.yml",
     "./package.json": "./package.json"
   },
   "files": [
     "src",
     "lib",
-    "data"
+    "data",
+    "cordis.patch.yml",
+    "README.md",
+    "LICENSE"
   ],
   "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
     "client": {
       "platform": "web",
       "inject": [
@@ -32,5 +39,29 @@
   },
   "devDependencies": {
     "esbuild": "^0.25.0"
+  },
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "model-pricing",
+    "llm-pricing",
+    "llm-catalog",
+    "pricing-comparison",
+    "ai-agents",
+    "openrouter",
+    "coding"
+  ],
+  "author": "Vitali Ryumshin",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vitas/dsh-model-pricing.git"
+  },
+  "bugs": {
+    "url": "https://github.com/vitas/dsh-model-pricing/issues"
+  },
+  "homepage": "https://github.com/vitas/dsh-model-pricing#readme",
+  "engines": {
+    "node": ">=18"
   }
 }

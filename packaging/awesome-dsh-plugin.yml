@@ -1,0 +1,9 @@
+# Ready-to-submit entry for https://github.com/awesome-dsh-plugin/awesome-dsh-plugin
+# Open a PR that adds this file to the list repo as:
+#   data/plugins/vitas__dsh-model-pricing.yml
+# (READMEs in that repo are generated from data/plugins/*.yml — do not edit them.)
+url: https://github.com/vitas/dsh-model-pricing
+name: vitas/dsh-model-pricing
+category: model
+description:
+  en: 'Per-1M-token pricing, capability tags, and live cross-provider comparison for every model you can connect, in the DSH settings page.'

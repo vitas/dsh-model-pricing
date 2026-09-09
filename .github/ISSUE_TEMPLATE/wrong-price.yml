@@ -1,0 +1,40 @@
+name: Wrong or missing price
+description: Report a price, tag, or model that looks incorrect in the pricing table
+title: "[data] <provider>/<model>: <short summary>"
+labels: [data-quality]
+body:
+  - type: markdown
+    attributes:
+      value: >
+        Prices come from [models.dev](https://models.dev) and the DSH-bundled
+        `pi-ai` catalog. If a number is wrong, the fix is usually upstream; this
+        issue helps us flag it and add a local override if needed.
+  - type: input
+    id: model
+    attributes:
+      label: Provider / model id shown in the table
+      placeholder: deepseek/deepseek-v4-flash
+    validations:
+      required: true
+  - type: input
+    id: shown
+    attributes:
+      label: What the plugin shows
+      placeholder: input $0.14 / output $0.28 per 1M
+  - type: input
+    id: expected
+    attributes:
+      label: What it should be (and the source you checked)
+      placeholder: "provider page says $0.27 / $1.10 — https://..."
+    validations:
+      required: true
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Problem type
+      options: [Wrong price, Wrong capability tag, Model missing, Model duplicated, Other]
+  - type: textarea
+    id: notes
+    attributes:
+      label: Anything else
+      placeholder: How to reproduce, which route/provider tab you compared against, plugin version.
