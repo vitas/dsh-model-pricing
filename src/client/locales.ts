@@ -46,6 +46,18 @@ export const en = {
   rowDetail: 'id: {provider}/{modelId} · max output: {maxOutput} · modalities: {modalities}',
   perMillion: 'per 1M tokens, USD',
   emptyFilter: 'No models match the current filters.',
+  settingsHint: 'Controls the pricing table under Settings → Models. Changes apply without a restart.',
+  ttlField: 'Refresh interval (minutes)',
+  ttlHint: 'How often the catalog is refetched in the background.',
+  sourceField: 'Catalog source URL',
+  sourceHint: 'models.dev document the table is built from; applies on the next load.',
+  tagRulesField: 'Tag rules (JSON)',
+  tagRulesHint: 'Optional {"extend": …} or {"override": …} rules; leave empty for defaults.',
+  overridden: 'overridden',
+  reset: 'reset',
+  invalidNumber: 'Enter a positive number',
+  invalidUrl: 'Enter an http(s) URL',
+  invalidJson: 'Invalid JSON',
 }
 
 export const zh = {
@@ -87,6 +99,18 @@ export const zh = {
   rowDetail: 'ID：{provider}/{modelId} · 最大输出：{maxOutput} · 模态：{modalities}',
   perMillion: '每 100 万 token，美元',
   emptyFilter: '没有符合当前筛选条件的模型。',
+  settingsHint: '控制“设置 → 模型”中的价格表；更改即时生效，无需重启。',
+  ttlField: '刷新间隔（分钟）',
+  ttlHint: '后台重新获取目录的频率。',
+  sourceField: '目录来源 URL',
+  sourceHint: '用于生成价格表的 models.dev 文档；下次加载时生效。',
+  tagRulesField: '标签规则（JSON）',
+  tagRulesHint: '可选 {"extend": …} 或 {"override": …}；留空则使用默认。',
+  overridden: '已自定义',
+  reset: '重置',
+  invalidNumber: '请输入正数',
+  invalidUrl: '请输入 http(s) URL',
+  invalidJson: 'JSON 无效',
 }
 
 export const ru = {
@@ -128,6 +152,18 @@ export const ru = {
   rowDetail: 'id: {provider}/{modelId} · макс. вывод: {maxOutput} · модальности: {modalities}',
   perMillion: 'за 1 млн токенов, USD',
   emptyFilter: 'Ни одна модель не подходит под фильтры.',
+  settingsHint: 'Управляет таблицей цен в «Настройки → Модели». Изменения применяются без перезапуска.',
+  ttlField: 'Интервал обновления (минуты)',
+  ttlHint: 'Как часто каталог обновляется в фоне.',
+  sourceField: 'URL источника каталога',
+  sourceHint: 'Документ models.dev, из которого строится таблица; применится при следующей загрузке.',
+  tagRulesField: 'Правила меток (JSON)',
+  tagRulesHint: 'Необязательно {"extend": …} или {"override": …}; пусто — по умолчанию.',
+  overridden: 'изменено',
+  reset: 'сбросить',
+  invalidNumber: 'Введите положительное число',
+  invalidUrl: 'Введите http(s) URL',
+  invalidJson: 'Некорректный JSON',
 }
 
 export type CopyKey = keyof typeof en

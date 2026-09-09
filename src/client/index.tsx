@@ -15,6 +15,7 @@
 import * as React from 'react'
 import { createStore } from './store.js'
 import { PricingTable, PricingHeader } from './PricingTable.js'
+import { PricingSettingsCard } from './SettingsCard.js'
 import { bindTranslator } from './i18n.js'
 import { en, zh, ru } from './locales.js'
 import type { PricingPayload } from './types.js'
@@ -82,4 +83,18 @@ export function apply(ctx: any) {
   wireLocale(ctx)
   ctx.slots.inject('settings.models.footer', () =>
     ctx.slots.register({ name: 'settings.models.footer', id: 'model-pricing', order: 100 }, PricingSection))
+  // E4: an editable card on the Plugins settings tab, claimed by the namespace the
+  // host registers. Optional seam: without settingsScope (a composition with no
+  // settings UI) nothing renders and nothing throws.
+  ctx.inject(['settingsScope'], (c: any) => {
+    try {
+      const scope = c.settingsScope.bind({ namespace: NS })
+      c.slots.inject('settings.plugin.item', () =>
+        c.slots.register({ name: 'settings.plugin.item', key: NS, id: 'model-pricing', order: 10 }, () => (
+          React.createElement(PricingSettingsCard, { scope })
+        )))
+    } catch {
+      // binding anomalies must never break the settings page itself
+    }
+  })
 }
