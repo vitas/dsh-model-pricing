@@ -1,260 +1,272 @@
-# Архитектура — dsh-model-pricing
+# Architecture — dsh-model-pricing
 
-Статус: черновик v0.1 после закрытия Q1–Q4 из
-[feature-map.md](feature-map.md). Дизайн UI — следующий документ после ревью этого.
+Status: draft v0.1. Feature decisions (Q1–Q4) from
+[feature-map.md](feature-map.md) are reflected here. UI details live in
+[design.md](design.md).
 
-## 1. Контекст и жёсткие ограничения платформы
+## 1. Deployment model
 
-1. **Out-of-tree.** Плагин живёт вне репо DSH, ставится в профиль
-   (`dsh plugin --profile web add dsh-model-pricing`). Следствия:
-   - нельзя делать value-импорты из клиентских пакетов DSH (bundle-purity gate);
-     типы чужих слотов — только `import type`;
-   - кодогенерация typert `/remote`-артефактов пресетом репо не покрыта —
-     транспорт выбираем без неё (решение Q1);
-   - клиентский бандл обязан воспроизвести формат «lazy-CJS factory artifact»
-     лоадера `dsh-client-modules` (свой tsdown-конфиг, S1 в спайках).
-2. **Две половины в одном пакете** (по cookbook `adding-a-settings-card`):
-   host — `src/`, экспорт `.`; browser — `src/client/`, экспорт `./client` +
-   манифест `dsh.client` с `inject` на пакет-хост слота.
-3. **Монтаж слотов:** клиент регистрируется в
-   `settings.models.footer` (list) и `settings.models.provider-card`
-   (keyed, `entryKey = settingsNs` провайдера) через `ctx.slots.inject`;
-   активен только когда смонтирован `dsh-client-ui-settings-models`
-   (декларация `dsh.client.inject` гарантирует порядок).
-4. **Данные моделей для «моих провайдеров»** клиент берёт из тех же сервисов,
-   что и страница Models: settings-снапшот + credential-описания +
-   `llm/adapters-updated` forwarded event; свою копию каталога не держим.
+There is no server operated by this project. The plugin has two halves, both running on
+the user's machine:
 
-## 2. Транспорт Host→Client (решение Q1)
+- **Host half:** a Node module inside the user's `dsh` process. It fetches public data
+  sources, caches and merges them, and serves a local HTTP route on the same port the
+  web GUI already listens on.
+- **Browser half:** a client plugin bundle served by DSH's own module system; it
+  renders the pricing UI into the Models settings page.
 
-Выбран **вариант B: именованный HTTP-роут хоста + embedded-снапшот**, а не
-typert Remote и не чистый браузерный fetch.
+Outbound network traffic consists of anonymous `GET` requests to public sources
+(`models.dev`, optionally `openrouter.ai`, and the promotion feed served as static
+files from this repository through `raw.githubusercontent.com`). No credentials are
+sent anywhere by the plugin; no telemetry is produced.
+
+## 2. Host-to-client transport (decision Q1)
+
+Chosen design: **a named HTTP route on the Host half, with an embedded build-time
+snapshot as fallback.** Three alternatives were considered and rejected:
+
+- **Browser fetches models.dev directly.** CORS allows it, but every browser would
+  download ~4.5 MB, caching would not survive reloads or multiple windows, the host's
+  system proxy settings would not apply, and the later `/pricing` command (Epic D)
+  needs the same data on the Node side anyway.
+- **A typed Remote API (`@Remote` namespaces).** This is DSH's canonical mechanism, but
+  it depends on repository-internal code generation for client declarations and codecs,
+  which is not published for out-of-tree packages. Revisit when available.
+- **Settings-payload tricks.** Rejected as unidiomatic.
+
+The route registry itself was verified in a spike (see `spike/RESULTS.md`): an
+out-of-tree plugin can register `GET /model-pricing/snapshot` on a running DSH web
+server; the plugin's other routes coexist with DSH's own (`/api`, `/plugins`, the SPA
+fallback) because matching is exact-first and registration failures throw on collision.
 
 ```
-                    ┌────────────────────────── host (Node) ──────────────────────────┐
- models.dev ──fetch──┤ PricingCatalog service ── TTL cache ── prune/merge ── GET       │
- pi-catalog ──import─┤   (ctx.webServer.register('/model-pricing/snapshot'))           │
- (dsh-llm-pi-ai)     └───────────────┬──────────────────────────────────────────────┘
-                                     │ same-origin fetch (gzip)
-   браузер: client-половина плагина ─┤ 404/офлайн → embedded data/snapshot.json (npm)
-                                     └─ promo feed: raw.githubusercontent (CORS *, напрямую)
+ models.dev ──GET──┐                       HOST (user's dsh process)
+ pi-ai catalog ────┤   PricingCatalog service: validate → merge → prune
+ (imported)        ├──→ TTL cache (memory + plugin storage file)
+                   │           │
+                   │           ▼
+        GET /model-pricing/snapshot   (ETag, gzip, Cache-Control)
+                   │
+        same-origin fetch from the browser half
+                   │
+        on 404 / error → embedded data/snapshot.json (ships in npm package)
+        promotions     → raw.githubusercontent.com feed (fetched directly; CORS *)
 ```
 
-Почему не альтернативы:
-
-- **чистый client fetch models.dev** (CORS `*` проверен curl'ом): каждый браузер
-  тянет 4.5 МБ загрузкой страницы, кэш не персистентен, системный прокси
-  (`dsh-web-fetch-http`/launch environment) не наследуется, а позже `/pricing`
-  (D1) всё равно нужен хостовый доступ к тем же данным. Оставлен только как
-  опция «live refresh» и для promo-фида (мелкий файл).
-- **typert Remote** — канонический путь, но упирается в недоступную вне репо
-  кодогенерацию дeклараций/кодеков. Дорожная карта: переезд на Remote когда
-  DSH опубликует генератор для out-of-tree (адаптер транспорта изолирован —
-  см. §5 `SnapshotSource`).
-
-Seam подтверждён в установленном бандле: `dsh-client-connection` и
-`dsh-host-frontend-static` регистрируют роуты через `ctx.webServer.register`;
-webserver — чистый реестр (exact → longest prefix → fallback), gzip по config
-профиля web. В headless/SDK-профилях `webServer` нет → host-половина обязана
-монтироваться без него (опциональный inject), клиент тогда живёт на embedded
-снапшоте.
-
-## 3. Пакет и дерево репозитория
+## 3. Repository layout
 
 ```
 dsh-model-pricing/
 ├── src/
-│   ├── index.ts            # apply(ctx): settings.installSection + PricingCatalog + роут
-│   ├── config.ts           # z-схема секции model-pricing
+│   ├── index.ts              # apply(ctx): settings section, catalog service, route
+│   ├── config.ts             # schema for the model-pricing settings section
 │   ├── catalog/
-│   │   ├── sources.ts      # SnapshotSource: fetch models.dev | openrouter (опц.)
-│   │   ├── merge.ts        # merge с pi-catalog; source stamps; divergence flags
-│   │   ├── prune.ts        # поля только для UI (+ белый список провайдеров)
-│   │   └── cache.ts        # TTL + persist в storage плагина ($DSH_HOME/storages/...)
-│   ├── tags.ts             # движок правил A3 (дефолты + user rules из settings)
+│   │   ├── sources.ts        # SnapshotSource interface: models.dev fetch (+ extras)
+│   │   ├── merge.ts          # merge with pi-ai catalog; source stamps; divergence
+│   │   ├── prune.ts          # reduce to UI fields; provider allowlist support
+│   │   └── cache.ts          # TTL, persistence, invalidation
+│   ├── tags.ts               # tag-rule engine (defaults + user rules from settings)
 │   └── client/
-│       ├── index.tsx       # apply(): slots.inject footer + provider-card
+│       ├── index.tsx         # apply(): slot registrations (footer, provider-card)
 │       ├── PricingSection.tsx / PricingTable.tsx / FilterBar.tsx / Badges.tsx
-│       ├── store.ts        # client-store слайс: snapshot, filters, refresh-state
-│       ├── snapshot-data.ts# import embedded data/snapshot.json (фолбэк)
-│       └── locales.ts      # en/ru подписи (ctx.locale)
-├── data/snapshot.json      # build-time artifact (генератор ниже), едет в npm
-├── promos/<provider>.json  # курируемый вход (PR-контрибуции, B3)
-├── promo-dist/index.json   # CI-скомпилированный фид (источник для плагина)
-├── scripts/build-snapshot.ts
-├── .github/workflows/      # validate-promos.yml, publish-snapshot.yml, release.yml
-└── package.json            # exports . / ./client, dsh.client, files+data
+│       ├── store.ts          # client-side store: snapshot, filters, refresh state
+│       ├── snapshot-data.ts  # imports embedded data/snapshot.json (fallback)
+│       └── locales.ts        # label dictionaries (en, ru)
+├── data/snapshot.json        # build-time artifact, shipped in the npm package
+├── promos/<provider>.json    # curated promotion sources (pull-request land)
+├── promo-dist/index.json     # CI-compiled feed consumed by the plugin
+├── scripts/build-snapshot.ts # catalog fetch/merge/prune generator
+├── spike/                    # platform-validation evidence (see spike/RESULTS.md)
+└── package.json              # exports "." and "./client"; dsh.client declaration
 ```
 
-Единая нейминг-область: `dsh-model-pricing` (settings ns `model-pricing`,
-роут `/model-pricing/*`, storage-ключ `model-pricing`, locale ns `model-pricing`).
+Naming: one plugin — the npm package name (`dsh-model-pricing`), the settings
+namespace (`model-pricing`), route prefix (`/model-pricing/`), storage key, and locale
+namespace all align.
 
-## 4. Модель данных
+## 4. Data model
 
-### 4.1 Строка прайс-таблицы (`PricingRow`)
+### 4.1 Table row
 
 ```ts
 interface PricingRow {
-  provider: string; providerName: string;      // id провайдера каталога + display
+  provider: string; providerName: string;      // catalog id and display name
   modelId: string; name: string; description?: string;
-  family?: string;                              // ключ сравнения одной модели (B1)
-  cost: { input: number; output: number; cacheRead?: number; cacheWrite?: number;
-          tiers?: { inputTokensAbove: number; input: number; output: number }[] };
-  context?: number; maxOutput?: number;
-  caps: { reasoning: boolean; toolCall: boolean; structuredOutput: boolean;
-          attachment: boolean; openWeights: boolean;
-          inputModalities: ('text'|'image'|'audio'|'video')[] };
-  tags: string[];                                // вычислены тег-движком на хосте
-  sources: { origin: 'models.dev'|'pi-catalog'|'override';
-             updated?: string; divergent?: boolean }[]; // A2/⚠-иконка
-  status?: string;                               // catalog status (deprecated и т.п.)
+  family?: string;                             // cross-provider comparison key (B1)
+  cost: {
+    input: number; output: number;             // USD per 1M tokens
+    cacheRead?: number; cacheWrite?: number;
+    tiers?: { inputTokensAbove: number; input: number; output: number }[];
+  };
+  context?: number; maxOutput?: number;        // tokens
+  caps: {
+    reasoning: boolean; toolCall: boolean; structuredOutput: boolean;
+    attachment: boolean; openWeights: boolean;
+    inputModalities: ('text' | 'image' | 'audio' | 'video')[];
+  };
+  tags: string[];                              // computed by the host tag engine (A3)
+  sources: {
+    origin: 'models.dev' | 'pi-catalog' | 'override';
+    updated?: string;                          // ISO date from the source
+    divergent?: boolean;                       // >10% disagreement between sources
+  }[];
+  status?: string;                             // catalog status (e.g. deprecated)
 }
 ```
 
-Хост отдаёт `{ generatedAt, ttl, rows }` — только просцененные строки включённых
-источников. Оценка прореженного снапшота: 213 provider × ~60 полей-минимум ≈
-0.8–1.2 МБ raw / ~40–60 КБ gzip; embedded-версия дополнительно режется до
-«каталог как у pi-ai + топ-100 по агентной популярности» (~300 КБ raw).
+The Host serves `{ generatedAt, ttl, rows }` containing only enabled sources, pruned to
+the fields above. Estimated pruned size: 0.8–1.2 MB uncompressed, 40–60 KB gzipped;
+the embedded fallback is further limited to the pi-ai catalog plus a curated top list
+(~300 KB uncompressed).
 
-### 4.2 Merge-политика источников
+### 4.2 Source merge policy
 
-1. Для `(provider, model)`, присутствующих в локальном pi-catalog (т.е. реальных
-   маршрутах DSH), цена берётся из pi-catalog — она та, по которой пойдёт запрос.
-2. Остальное — models.dev.
-3. Расхождение цен > 10% на совпадающей паре → `divergent: true` (иконка ⚠ в UI,
-   tooltip с обоими значениями).
-4. `status: 'beta'|'deprecated'` и отключённые источники фильтруются до merge.
+1. For any (provider, model) pair present in the local pi-ai catalog — i.e. a route the
+   user can actually invoke — the pi-ai price wins: it is the price the request will be
+   billed from.
+2. Everything else comes from models.dev.
+3. Matching pairs whose prices differ by more than 10% are flagged `divergent`; the UI
+   shows both values.
+4. Entries with non-default `status` and disabled sources are filtered before merging.
 
-### 4.3 Promo-фид (B3, контрибуции через PR)
+### 4.3 Promotion feed (B3)
 
-`promos/<provider>.json` (исходник, ревьюится):
+Source files in this repository, `promos/<provider>.json`:
 
 ```jsonc
-[{ "model": "glm-5.2", "promo": "GLM Coding Lite — 50% first month",
-   "discountPct": 50, "until": "2026-10-01", "url": "https://z.ai/promo",
-   "verifiedAt": "2026-09-01", "by": "github-handle" }]
+[
+  {
+    "model": "glm-5.2",                 // catalog model id
+    "promo": "GLM Coding Lite - 50% first month",
+    "discountPct": 50,                 // or fixedCost for absolute prices
+    "until": "2026-10-01",             // required, ISO date
+    "url": "https://example.com/promo",
+    "verifiedAt": "2026-09-01",         // required
+    "by": "github-handle"               // attribution
+  }
+]
 ```
 
-CI (`validate-promos.yml`): zod/ajv-схема, обязательные поля, `until` в будущем,
-уникальность `(provider, model, promo)`; на merge в main пересобирает
-`promo-dist/index.json` (список активных) — его и фетчит клиент
-(CORS `*` подтверждён). Плагин гасит всё, где `until < now` (B4), даже если CI
-проспал; свой `until` у строки не бесконечный — mandatory по схеме.
+Contribution flow: a user opens a pull request changing `promos/**`. CI validates
+schema, required fields, future `until`, and duplicate (provider, model, promo) keys.
+On merge to `main`, CI compiles the active entries into `promo-dist/index.json`, which
+is what the plugin fetches (default URL points at this repository; configurable in
+settings). Independently, the plugin hides any record whose `until` has passed, so a
+missed CI run cannot display an expired offer.
 
-### 4.4 Тег-правила (A3, настраиваемые)
+### 4.4 Tag rules (A3, configurable)
 
 ```ts
 interface TagRule { tag: string; when: Predicate; }
 type Predicate =
-  | { field: 'toolCall'|'reasoning'|'structuredOutput'|'openWeights'|'attachment'; equals: boolean }
-  | { field: 'context'|'maxOutput'; gte: number }
-  | { field: 'description'; contains: string[] }        // lowercase substring
+  | { field: 'toolCall' | 'reasoning' | 'structuredOutput' | 'openWeights' | 'attachment'; equals: boolean }
+  | { field: 'context' | 'maxOutput'; gte: number }
+  | { field: 'description'; contains: string[] }     // case-insensitive substring
   | { field: 'inputModalities'; includes: string }
   | { all: Predicate[] } | { any: Predicate[] };
 ```
 
-Дефолтный набор = правила из feature-map A3. В settings: `tagRules.extend`
-(дополнить дефолты) и `tagRules.override` (заменить целиком). В v1 редактируется
-только JSON-полем карточки настроек — UI-конструктор не делаем.
+Default rules ship with the package and implement the mapping in A3. Settings offer
+`tagRules.extend` (add rules) and `tagRules.override` (replace the list). v1 edits the
+JSON through the settings card; no rule-builder UI is planned.
 
-## 5. Компоненты и контракты
+## 5. Components and contracts
 
-### 5.1 `PricingCatalog` (host, Cordis Service `modelPricing`)
+### 5.1 `PricingCatalog` (Host service)
 
-- `inject`: `['settings']` обязательные; `webServer`, `llm` — опциональные
-  (через `ctx.inject([...])`, деградация без них).
-- `SnapshotSource`-интерфейс (`fetch(): Promise<PricingRow[]>`) — сюда
-  models.dev, позже openrouter и (m2) типертовские потребители; merge —
-  чистая функция над массивами источников.
-- Кэш: память + JSON в `storages`; инвалидация по TTL (default 6h) и по
-  `settings`-мутации; `?fresh=1` — force-refresh.
-- ETag-кэширование ответа: sha256 снапшота, `304` — страница Models
-  обновляется на forwarded events, без If-None-Match не грузим тело.
+- Required dependencies: `settings`. Optional: `webServer`, `llm` — accessed through
+  runtime capability checks so the plugin also loads in profiles without a web server
+  (headless/SDK), where only the embedded-snapshot consumers and Epic D exist.
+- A `SnapshotSource` interface (`fetch(): Promise<PricingRow[]>`) isolates each input
+  (models.dev today; OpenRouter optional later).
+- Caching: memory plus a JSON file under the plugin's storage directory. TTL default 6
+  hours; invalidation on TTL expiry, on settings change, and on force refresh.
+- Catalog work is lazy: nothing is fetched or parsed until the first client request or
+  explicit refresh.
 
-### 5.2 Роут
+### 5.2 Routes
 
-`GET /model-pricing/snapshot[?fresh=1]` → `{ generatedAt, ttl, rows }`
-(+ `Cache-Control: private, max-age=TTL`); `POST /model-pricing/refresh` (без
-тела) — инвалидация, для кнопки Refresh. Оба exact-роута, префиксов не берём
-(коллизия с чужими роутами = throw, реестр это проверяет сам).
+- `GET /model-pricing/snapshot` → `{ generatedAt, ttl, rows }` with `ETag` (hash of the
+  snapshot) and `Cache-Control: private, max-age=TTL`; conditional requests answer 304;
+  `?fresh=1` forces a source refresh first.
+- `POST /model-pricing/refresh` → invalidates the cache (used by the Refresh button).
+- Both routes are `exact`; the plugin never claims prefixes beyond `/model-pricing/`
+  behavior reserved for future rows.
 
-### 5.3 Клиент
+### 5.3 Client half
 
-- `apply(ctx)` с `inject = ['slots', 'locale', 'connection', 'remote', 'settingsScope', ...]`
-  (ровно как в cookbook, плюс `clientStore`).
-- Footer-секция: fetch роута (same-origin) → store → `<PricingTable>` на
-  `dsh-client-ui-primitives` (type-import только для контракта слота; примитивы
-  рендерим свои — purity gate запрещает value-импорты).
-- Провайдер-бейджи: keyed-слот `settings.models.provider-card` с
-  `entryKey = settingsNs`: из owner-props берём `ConfigurableProviderView`
-  (модельный список карточки) → min/max цены, `cheapest`-чип, активные промо.
-- Состояние таблицы — `ctx.clientStore` (тот же сервис, что у страницы Models),
-  персист фильтров не делаем.
-- Локализация: ключи `model-pricing.table.*` через `ctx.locale`, en + ru.
+- Registers into `settings.models.footer` and `settings.models.provider-card` via
+  `ctx.slots.inject(...)`; the provider-card registration keys on each provider's
+  settings namespace and receives the card's provider view, configured state, and
+  API-key state from the slot's owner props.
+- Fetches the snapshot route same-origin; on failure uses the embedded snapshot and
+  labels the state. Data lives in one client store shared by the table and the card
+  badges.
+- Refreshes on forwarded events already used by the Models page (adapter topology and
+  settings updates) to keep the "Only mine" view correct.
+- Localization through `ctx.locale` with English and Russian dictionaries.
 
-## 6. Build/CI pipeline
+## 6. Build and CI
 
-| Workflow | Триггер | Делает |
-|----------|---------|--------|
-| `build-snapshot.yml` | релиз / weekly cron | `scripts/build-snapshot.ts`: скачивает models.dev + pi-catalog, merge/prune → `data/snapshot.json`, коммит artifact в release + PR с diff цен |
-| `validate-promos.yml` | PR в `promos/**` | схема, `until`-гейт, дубликаты |
-| `publish-promos.yml` | push main | компиляция `promo-dist/index.json`, push |
-| `test.yml` | PR | vitest (merge/prune/cache/tag-engine), typecheck host+client |
+| Workflow | Trigger | Purpose |
+|----------|---------|---------|
+| `build-snapshot.yml` | release and weekly schedule | regenerate `data/snapshot.json` (fetch, merge, prune), upload as release asset, open a diff PR for review |
+| `validate-promos.yml` | pull requests touching `promos/**` | schema and expiry validation, duplicate detection |
+| `publish-promos.yml` | push to `main` | compile `promo-dist/index.json` |
+| `test.yml` | every PR | unit tests, type checking of both halves |
 
-`weekly` cron на снапшот — чтобы embedded-фолбэк не протухал между релизами.
+The weekly snapshot regeneration keeps the offline fallback reasonably fresh between
+releases.
 
-## 7. Монтаж в профиль
+## 7. Installation and development workflow
 
 ```sh
-dsh plugin --profile web add dsh-model-pricing
+dsh plugin --profile web add dsh-model-pricing   # end users
 ```
 
-- Что делает команда из доков: pnpm-установка в профиль; попадёт ли пакет
-  автоматически в `dsh.profile.bundles` — **S4 spike**; если нет — в инструкции
-  второй шаг: вписать имя пакета в `bundles` профиля или
-  `cordis.patch.yml`: `- insert: [{ id: model-pricing, name: dsh-model-pricing }]`.
-- Обновление/удаление — стандартный pnpm-цикл профиля; storage-файл плагина
-  остаётся (документировать путь очистки).
+Spike findings that shape this workflow (`spike/RESULTS.md`):
 
-## 8. Тест-стратегия
+- `dsh plugin add` installs the dependency; a package is only activated as a profile
+  layer when it declares a `dsh.bundle` manifest field, otherwise it must be mounted
+  through the profile patch file (`cordis.patch.yml`).
+- Mounting by package name works at server start; applying it to a long-running
+  instance requires a restart. Mounting by absolute file path works for live
+  development, but edited code is cached per module URL — during development use fresh
+  file names or restart.
+- Practical development loop: `cordis.patch.yml` insert of the built host entry by
+  path for UI iteration, with the browser half hot-reloaded by DSH's HMR when a
+  rebuild watcher is running; restart for package-name mounts.
 
-- **Чистые функции в приоритете:** merge (pi-vs-models authority, divergent),
-  prune, tag-движок (дефолты + extend/override), кэш-политика TTL, парсер
-  promo-фида (просрочка/схема).
-- Хост-роуты: supertest-подобный прогон над `WebServer`-таблицей (etag, 304,
-  `fresh=1`, отсутствие webServer в композиции).
-- Клиент: рендер-смоук на `dsh-client-test-runtime`-двойках (`TestRemote`,
-  слоты, locale) + golden-разметка пустого/офлайн/ошибочного состояний.
-- Контракт снапшота: фикстура `tests/fixtures/modelsdev.sample.json` — защита
-  от дрейфа формата models.dev (риск-таблица спеки).
-- Ручная приёмка DoD-чеклиста MVP на реальном профиле web.
+## 8. Test strategy
 
-## 9. Эволюция (согласована с дорожной картой фич)
+- Pure logic is tested first: merge policy (pi-ai precedence, divergence flags),
+  pruning, TTL/cache behavior, tag engine (defaults, extend, override), promotion-feed
+  parsing (schema, expiry, duplicates).
+- Host routes: exercised against the web-server route table (200/304/ETag, `fresh=1`,
+  graceful absence of `webServer` in a composition without one).
+- Client half: component smoke tests against DSH's published test doubles for the
+  client runtime (Remote and slots), plus golden markup for loading, offline, and
+  error states.
+- A fixed models.dev fixture protects against upstream schema drift.
+- Manual acceptance against the MVP definition of done on a real web profile.
 
-| Веха | Что добавляет в архитектуру |
-|------|------------------------------|
-| **M1 = v0.1 (A+E)** | всё вышеперечисленное |
-| **M2 (B-auto, C)** | family-группировка в merge (`byFamily: Map` на хосте), blended-метрика A6 в `PricingRow.effective`, промо-колонка в таблице (данные уже есть в `promo-dist`), бейджи карточек |
-| **M3 (B-curated UI, D)** | `ctx.commandUi` popup `/pricing` (тот же store), D2-оценка сессии: `ctx.tokenMeter.measure()` доступен только на хосте → маленький Remote-хост-хелпер; если к тому времени появится публичная typert-кодогенерация — это её первый потребитель (S5), иначе — временный роут `POST /model-pricing/session-cost` c id-сессии |
+## 9. Milestones
 
-## 10. Спайки (снять до кода M1)
+| Milestone | Adds |
+|-----------|------|
+| **M1 = v0.1 (Epics A + E)** | everything described above |
+| **M2 (B1 + C)** | family grouping in the merged snapshot, blended price (A6) on rows, promotion column, provider-card badges |
+| **M3 (B3 UI polish + D)** | `/pricing` popup (reuses the same store), session-cost estimate: token measurement lives on the Host, so the first version either posts the measured totals to a small host route or moves to a typed Remote if DSH publishes out-of-tree code generation by then |
 
-| # | Гипотеза | Успех |
-|---|----------|-------|
-| S1 | Наш `./client` бандл формата lazy-CJS factory принимается `dsh-client-modules` и доходит до страницы | секция рендерится с HMR |
-| S2 | `dsh.client.inject` на `dsh-client-ui-settings-models` гарантирует монтирование после хоста слота | слот не «unknown slot» |
-| S3 | Регистрация `ctx.webServer.register('/model-pricing/snapshot')` из out-of-tree плагина в web-профиле | 200/304 из браузера |
-| S4 | Поведение `dsh plugin add`: автозапись в `bundles` или нужен патч | documented install path |
-| S5 | (для M3) применимость typert-кодогенерации вне репо | отложить с планом B (§9) |
+## 10. Architectural risks
 
-## 11. Риски архитектуры
-
-- **Формат lazy-CJS бандла нигде не задокументирован публично** (только
-  tsdown-конфиг репо) — главный технический риск; снимается S1 на 1-й день, фолбэк
-  — копировать артефакт-форм с пакета-примера `ui-theme` из npm-dists.
-- Фолбэк-роут SPA (`registerFallback`) не даёт префиксу `/model-pricing/`
-  провалиться в index.html — exact-регистрация конфликтует только с собой.
-- 4.5 МБ парсинг на хосте при старте — ленивый, только по первому запросу
-  клиента/Refresh, не на activate.
-- models.dev без SLA: схема через `unknown`-валидатор, любая деградация —
-  к предыдущему кэш-снапшоту, затем к embedded, UI честно показывает origin+age.
+- **The client bundle format ("lazy-CJS factory") is only specified by DSH's own build
+  presets, not by public documentation.** Mitigated by a working reference artifact on
+  disk and confirmed by spike S1; remains the highest platform risk for future DSH
+  versions — pin tested DSH versions in release notes.
+- models.dev has no service-level agreement: parse defensively, degrade one step at a
+  time (cache → embedded), always display source and age.
+- Route collisions with other plugins fail loudly at registration — acceptable:
+  configuration errors should be visible.
+- Large first snapshot parse cost on the Host (multi-MB JSON): lazy, once per TTL, off
+  the activation path.

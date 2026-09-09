@@ -1,147 +1,161 @@
 # Feature Map — dsh-model-pricing
 
-Плагин для DeepSeek Harness, показывающий цены и сильные стороны моделей,
-которые можно подключить к DSH, включая активные акции/скидки.
+A DeepSeek Harness (DSH) plugin that shows the prices and strengths of every model you
+can connect to DSH, including current discounts and promotions.
 
-Статус: черновик v0.1 для ревью. Решённый скоуп MVP (выбор пользователя):
-**прайс-таблица на странице Models** (эпик A + инфраструктура E).
-Архитектура и UX-дизайн — отдельный документ после ревью этой карты.
+Status: draft v0.1 for review. Confirmed MVP scope: **a pricing table on the Models
+settings page** (Epic A + infrastructure Epic E). Architecture and UI design are
+separate documents: [architecture.md](architecture.md), [design.md](design.md).
 
-Проверенные факты о платформе (DSH `0.1.2-rc.1`, репо `deepseek-ai/deepseek-harness`):
+## Verified platform facts
 
--_ui-слоты_ `settings.models.footer` (list) и `settings.models.provider-card`
-(keyed, ключ = settings-неймспейс провайдера) задекларированы в
-`@deepseek-ai/dsh-client-ui-settings-models` специально для внешних плагинов;
-проверено grep’ом в установленном бандле.
-- Каталог `@earendil-works/pi-ai` (уже в зависимостях `dsh-llm-pi-ai`) несёт
-`cost: {input, output, cacheRead, cacheWrite}` в USD за 1M токенов + `tiers`
-(пороговые уровни цены по размеру контекста).
-- `https://models.dev/api.json` — 213 провайдера, у модели: `description`,
-`family`, `reasoning`, `reasoning_options`, `tool_call`, `structured_output`,
-`attachment`, `modalities`, `open_weights`, `limit.{context,output}`,
-`cost.{input,output,reasoning,cache_read,cache_write}`, `release_date`,
-`status`. Promo-полей в схеме нет (проверено по всем ключам).
-- `ctx.tokenMeter` (`dsh-token-meter`) умеет replay-замер токенов сессии
-(`measure(session)`) и оценку сообщения; в USD не конвертирует — это наша работа.
-- Плагин ставится как out-of-tree пакет в профиль: `dsh plugin --profile web add <pkg>`;
-клиентская половина подхватывается через `dsh.client` без пересборки web-app;
-HMR-ресивер клиентских плагинов активен в текущей сессии.
-- Cookbook-доки репо: `docs/cookbook/adding-a-settings-card.md`,
-`docs/cookbook/adding-a-remote-api.md` (шаблон Host→Client данных).
-- `dsh-host-webserver` — реестр именованных HTTP-роутов: feature-плагин регистрирует
-свой роут через `ctx.webServer.register(route)` (подтверждено grep'ом: так делают
-`dsh-client-connection` и `dsh-host-frontend-static`). Значит хост-половине плагина
-не обязателен typert-Remote со всей его кодогенерацией.
-- CORS `access-control-allow-origin: *` подтверждён curl'ом у всех трёх источников:
-`models.dev/api.json`, `raw.githubusercontent.com/…`, `openrouter.ai/api/v1/models`
-— прямые fetch'и из браузера возможны как фолбэк.
+All facts below were checked against the installed DSH build (version 0.1.2-rc.1)
+and the public [deepseek-ai/deepseek-harness](https://github.com/deepseek-ai/deepseek-harness)
+documentation on 2026-09-09.
 
----
+1. `@deepseek-ai/dsh-client-ui-settings-models` (the Models settings page) declares two
+   extension slots intended for plugins distributed outside the DSH repository:
+   `settings.models.footer` (an ordered list rendered below the provider rows) and
+   `settings.models.provider-card` (rendered inside each provider card). Verified in the
+   installed bundle.
+2. The `@earendil-works/pi-ai` model catalog — already a dependency of DSH's
+   `dsh-llm-pi-ai` adapter — contains a `cost` field per model:
+   `{ input, output, cacheRead, cacheWrite }` in USD per 1M tokens, plus optional
+   `tiers` (price thresholds based on request input size).
+3. [`https://models.dev/api.json`](https://models.dev) is a community catalog of 213
+   providers. Each model entry includes `description`, `family`, capability booleans
+   (`reasoning`, `tool_call`, `structured_output`, `attachment`), `modalities`,
+   `open_weights`, `limit.context` / `limit.output`, `cost` fields, and `release_date`.
+   The catalog has no promotion or discount fields (verified against every key in the
+   schema).
+4. The `dsh-token-meter` plugin can measure token usage of a session
+   (`ctx.tokenMeter.measure(session)`), priced per route, but does not convert to
+   currency anywhere, and no part of the current DSH UI displays model prices.
+5. `dsh-host-webserver` exposes a named-route registry: plugins register HTTP routes
+   through `ctx.webServer.register({ kind: 'exact' | 'prefix', path, handler })`.
+   Confirmed by inspection of installed DSH packages that register routes this way.
+6. The HTTP sources `models.dev`, `raw.githubusercontent.com`, and `openrouter.ai`
+   all respond with `access-control-allow-origin: *`, so they can be fetched
+   directly from the browser when needed. Verified with `curl`.
+7. A plugin ships as one npm package with two halves: a Host half (Node, runs inside
+   the user's `dsh` process) and a browser half (declared through the `dsh.client`
+   field in package.json, served to the page without rebuilding the DSH web app).
+   Install path: `dsh plugin --profile web add <package>`.
 
-## 1. Пользователи и сценарии
+## 1. Users and scenarios
 
-| # | Сценарий | Вопрос пользователя |
-|---|----------|---------------------|
-| S1 | Выбор нового провайдера | «Что взять для кодинга-агентов и сколько это стоит?» |
-| S2 | Сравнение роутов | «Тот же GLM у меня через z.ai или через openrouter — где дешевле?» |
-| S3 | Охота за акциями | «Где сейчас скидка/подписочный coding-plan выгоднее API?» |
-| S4 | Контроль затрат | «Сколько примерно стоит эта сессия / сколько будет следующая?» |
-| S5 | Диагностика | «Почему модель не выбирается» — контекст, лимиты, модальности рядом с ценой |
+| # | Scenario | User question |
+|---|----------|----------------|
+| S1 | Choosing a new provider | "Which model is good for coding agents, and what does it cost?" |
+| S2 | Comparing routes | "The same GLM is reachable through three providers — which one is cheapest?" |
+| S3 | Looking for deals | "Where is there an active discount or a subscription plan that beats pay-per-token right now?" |
+| S4 | Cost awareness | "Roughly what is this session costing me?" |
+| S5 | Diagnostics | "Why is this model unusable for me?" — context window, limits, and modalities next to the price |
 
-## 2. Эпики и фичи
+## 2. Epics and features
 
-Приоритет: **P0** — MVP, **P1** — вторая поставка, **P2** — дальше.
-Версии: v0.1 = A+E, v0.2 = B-auto + C, v0.3 = B-curated + D.
+Priorities: **P0** = MVP, **P1** = second release, **P2** = later.
+Releases: v0.1 = Epics A + E; v0.2 = Epic B (automatic part) + Epic C; v0.3 = Epic B
+(curated promotions) + Epic D.
 
-### Эпик A — Прайс-таблица на странице Models (P0)
+### Epic A — Pricing table on the Models page (P0, except A6)
 
-| ID | Фича | Детали |
-|----|------|--------|
-| A1 | Смонтированная секция «Model pricing» в футере Models | Слот `settings.models.footer`; рендерится только когда хост-половина плагина смонтирована (как карточки в `settings.plugin.item`) |
-| A2 | Таблица моделей | Колонки: провайдер · модель · $in / $out / cache-read за 1M · контекст · теги · источник цены и дата апдейта |
-| A3 | Теги сильных сторон, выводимые из каталога | Правила: `tool_call+reasoning` → «agentic»; `description` содержит coding/review/IDE → «coding»; `attachment`+vision-модальность → «vision»; `limit.context ≥ 200k` → «long-context»; `open_weights` → «open weights»; `structured_output` → «structured out». **Настраиваемые (решение Q3):** дефолтный набор правил едет в пакете, пользователь дополняет/переопределяет через settings `model-pricing.tagRules`; правила — данные (список предикатов над полями строки каталога), не код |
-| A4 | Поиск и фильтры | Подстрока по id/name, чипы-фильтры тегов, группировка по провайдеру, сортировка по $out и по цене за «типичный агентный запрос» (см. A6) |
-| A5 | «Только мои» + «только подключимые» | Выделять провайдеры, уже сконфигурированные в профиле (сверка с `llm/adapters-updated`), и те, чей API-ключ задан |
-| A6 | Итоговая цена запроса — **P1** (решение Q4) | Единая метрика сравнения: blended price = cacheRead×w₁ + input×w₂ + output×w₃ с дефолтом по долям токенов агентной нагрузки; веса — настройки. В MVP (v0.1) не входит: сортировка по $out, вторично по $in; $out выбран как метрика, потому что он единственный, на котором провайдеры не расходятся в трактовке cache-write. blended приходит вместе с B1, где нужен «один чип» для −N% |
-| A7 | Обновление и фолбэк | Клик «Refresh» + TTL-автообновление; сети нет → последний кэш-снапшот → нет и кэша → только локальный pi-ai каталог (он всегда есть). Промо-строка «цены ориентировочные, не биллинг» |
-| A8 | Настройки плагина | Секция `model-pricing`: источники (models.dev on/off, pi-catalog always), TTL, кэш вкл/выкл, язык подписей (en/ru через `ctx.locale`) |
-| A9 | Lazy-рендер и объёмы | Полная база ~4.5 МБ / 213 провайдеров: в браузер идёт прореженная страница (см. E2), в DOM — виртуализация или `details`-складка по провайдерам; дефолт — показывать топ-N «Coding & Agents» |
+| ID | Feature | Details |
+|----|---------|---------|
+| A1 | A "Model pricing" section mounted in the Models page footer | Uses the `settings.models.footer` slot; renders only when the plugin's Host half is mounted, mirroring the page's existing card rules |
+| A2 | The table itself | Columns: provider · model · input / output / cache-read price per 1M tokens · context window · capability tags · price source and freshness |
+| A3 | Capability tags derived from catalog data | Mapping rules: `tool_call` + `reasoning` → "Agentic"; description mentioning coding/review/IDE → "Coding"; `attachment` + vision modality → "Vision"; `context >= 200k` → "Long context"; `open_weights` → "Open weights"; `structured_output` → "Structured output". Rules are **configurable** (decision Q3): defaults ship inside the package; users add to them (`tagRules.extend`) or replace them (`tagRules.override`) through plugin settings. Rules are data (predicates over catalog fields), not code |
+| A4 | Search and filters | Substring search over model id/name/provider; capability-tag chips; grouping by provider; sorting by price columns and context size |
+| A5 | "Only mine" / "only connectable" view | Highlights providers already configured in the profile, reusing the page's existing configured/key-configured semantics |
+| A6 | Effective price per typical request — **P1** (decision Q4) | A single comparison figure: blended price = `w1*cacheRead + w2*input + w3*output` with configurable default weights reflecting agentic workloads. Not in v0.1: the default sort is by output price (the one column providers agree on); the blended figure arrives together with B1, where a single "cheaper by N%" number is needed |
+| A7 | Refresh and fallback behavior | Manual Refresh button plus TTL-based automatic refresh; if the network is unavailable, fall back to the last cached snapshot; if no cache exists, fall back to the embedded build-time snapshot; the UI always labels which source and age the displayed numbers have, and states that prices are estimates, not billing data |
+| A8 | Plugin settings | Settings section `model-pricing`: data sources on/off, refresh interval (TTL), promotion feed URL, tag rules, cache on/off |
+| A9 | Rendering cost | The full catalog is ~4.5 MB and 213 providers; the browser receives a pruned, paginated projection (see E2) and only expanded groups are in the DOM; the default view shows a curated first screen, not the whole catalog |
 
-### Эпик B — Акции и «где дешевле» (P1 auto → P2 curated)
+### Epic B — Discounts and "where is it cheaper" (P1 automatic, P2 curated)
 
-| ID | Фича | Детали |
-|----|------|--------|
-| B1 | Авто-детект «дешевле, чем где-то ещё» | Одна модель (key по `family`+id) между провайдерами: бейдж `−N% vs <провайдер>` и «cheapest» по метрике A6 |
-| B2 | Группа coding-plan тарифов | В models.dev уже есть `zai-coding-plan`, `minimax-coding-plan`, `kimi-for-coding`, `alibaba-coding-plan`, `tencent-coding-plan`, `stepfun-step-plan` и др.: отдельная секция «Подписки/плоские тарифы» с ценой плана вместо $/1M |
-| B3 | Курируемый промо-фид, community через PR (решение Q2) | В этом репо `promos/<provider>.json` с записями `{provider, model, promo, discount_pct|fixed_cost, until, url, verified_at}`; контрибьютор кидает PR, GitHub Action валидирует схему/gate `until` и пересобирает компилированный фид `promo-dist/index.json`; плагин ходит по умолчанию в raw-URL фида (URL настраивается в A8), просрочку гасит сам (B4). Ветка main защищается, ревью — путь «вклад юзеров» |
-| B4 | Индикатор доверия | У каждой цены/промо: источник (`models.dev` / `pi-catalog` / `curated`) и `last_updated`; просроченные промо гаснут и скрываются |
-| B5 | Time-based скидки провайдеров | Если у маршрута в каталоге появляются часовые тарифы (у DeepSeek были off-peak) — показывать активное окно; до появления данных — фича спит |
+| ID | Feature | Details |
+|----|---------|---------|
+| B1 | Automatic cross-provider comparison | Group models that share a `family` across providers; badge each row with `cheapest` and `−N% vs <provider>` using the A6 blended price |
+| B2 | Subscription / coding-plan providers as a separate group | The catalog already carries flat-rate plan providers (`zai-coding-plan`, `minimax-coding-plan`, `kimi-for-coding`, `alibaba-coding-plan`, `tencent-coding-plan`, …); show them as a "Flat-rate plans" section with monthly price instead of per-1M prices |
+| B3 | Community-curated promotion feed (decision Q2) | Promotion records live in this repository under `promos/<provider>.json` and are contributed through pull requests. A GitHub Actions workflow validates the schema and expiry fields and compiles an aggregated feed at `promo-dist/index.json`; the plugin fetches that feed by default (URL configurable). Without feed data there are no promotion badges |
+| B4 | Trust indicators | Every price shows its source and last-verified date; expired promotions are greyed out automatically |
+| B5 | Time-of-day discounts | If a provider publishes time-based pricing, show the currently active window; dormant until such data exists in a source we consume |
 
-### Эпик C — Бейджи в карточках провайдеров (P1)
+### Epic C — Badges on provider cards (P1)
 
-| ID | Фича | Детали |
-|----|------|--------|
-| C1 | `settings.models.provider-card` | Мини-строка в карточке: «от $X / $Y за 1M (min..max по моделям карточки)», cheapest-бейдж, активные промо для этого провайдера |
-| C2 | Реакция на редактирование | Карточка знает список моделей пользователя: цены пересчитываются поEffective-списку, а не по каталогу провайдера |
+| ID | Feature | Details |
+|----|---------|---------|
+| C1 | `settings.models.provider-card` slot | A compact line inside each provider card: price range across that provider's configured models, "cheapest route" chip, active promotions for that provider |
+| C2 | React to editing | The card knows the user's model list; badges reflect the effective list, not the raw catalog |
 
-### Эпик D — Команды и стоимость сессии (P2)
+### Epic D — Commands and session cost (P2)
 
-| ID | Фича | Детали |
-|----|------|--------|
-| D1 | `/pricing` popup | Цена текущей модели + 3 альтернативы по метрике A6, через `ctx.commandUi` (тот же механизм, что у `/model`) |
-| D2 | «Эта сессия ≈ $N» | `ctx.tokenMeter.measure(session)` (токены) × цена маршрута из A-каталога; в попапе `/pricing` и/или в stats-стрипе, если найдётся seam (см. Q5) |
-| D3 | Прогноз до compact | `contextPressure.projectedTokens` × цена → «следующий запрос ≈ $X» |
+| ID | Feature | Details |
+|----|---------|---------|
+| D1 | `/pricing` popup | Price of the current model plus the three closest alternatives by blended price, using the same popup mechanism as `/model` |
+| D2 | "This session ≈ $N" | `ctx.tokenMeter.measure(session)` (tokens) multiplied by the route price; shown in the `/pricing` popup and, if a supported extension point exists, in the stats strip (open question Q5) |
+| D3 | Projection before compaction | `contextPressure.projectedTokens` times the route price → "the next request ≈ $X" |
 
-### Эпик E — Инфраструктура (P0)
+### Epic E — Infrastructure (P0)
 
-| ID | Фича | Детали |
-|----|------|--------|
-| E1 | Host-сервис `PricingCatalog` | Fetch models.dev + merge pi-ai каталога; zod-подобная валидация схемы (schemastery); TTL; кэш-снапшот в storages плагина; event `pricing/updated` |
-| E2 | Host→Client транспорт — **решено (Q1)** | Свой HTTP-роут `GET /model-pricing/snapshot` через seam `ctx.webServer.register` (подтверждён в установленном бандле) + embedded build-time снапшот в npm-пакете как офлайн-фолбэк. Typert Remote — позже, когда появится публичный путь кодогенерации `/typert`+`/remote` для out-of-tree пакетов |
-| E3 | Клиентская половина | `src/client/` с `dsh.client`-декларацией; React-таблица на `dsh-client-ui-primitives`; никаких value-импортов из чужих клиент-пакетов (bundle-purity gate) |
-| E4 | Settings-секция `model-pricing` | `ctx.settings.installSection` + карточка в `settings.plugin.item` |
-| E5 | Приватность | Один исходящий fetch по адресу из A8; полный офлайн-режим = только pi-catalog; никаких телеметрии |
-| E6 | Дистрибуция | npm-пакет; профиль web: `dsh plugin --profile web add`; документация установки/обновления/удаления |
+| ID | Feature | Details |
+|----|---------|---------|
+| E1 | Host service `PricingCatalog` | Fetches models.dev and merges the local pi-ai catalog; validates the input schema; TTL cache persisted in the plugin's own storage; emits an update event |
+| E2 | Host-to-client transport — **decided** (Q1) | The Host half serves `GET /model-pricing/snapshot` through the webServer route registry and prunes the payload to UI-relevant fields; the browser half has an embedded build-time snapshot as fallback. A typed Remote API is deferred until DSH publishes code generation for out-of-tree packages |
+| E3 | Browser half | `src/client/` exported as `./client` with a `dsh.client` declaration; renders its own components; no value imports from other client packages (enforced by DSH's bundle-purity rule) |
+| E4 | Settings section `model-pricing` | Registered through `settings.installSection`; appears as a card on the Plugins settings tab |
+| E5 | Privacy | Exactly one outbound HTTP host is contacted (configurable); a full offline mode uses only the embedded snapshot; no telemetry of any kind |
+| E6 | Distribution | npm package; one-command install into the web profile; documented update and uninstall (including cache-file cleanup) |
 
-## 3. Definition of Done для MVP (A+E)
+## 3. Definition of Done for the MVP (Epics A + E)
 
-1. На странице Models ниже списка провайдеров появляется секция с ценами ≥3 реальных
-   провайдеров из моего профиля + топ-N каталога, с корректными $in/$out/cache.
-2. Переключение сети на «нет» не ломает секцию: кэш → pi-catalog, явная подпись источника.
-3. `Refresh` и TTL обновляют данные; `llm/adapters-updated` инвалидирует выделение «моих».
-4. Фильтр/поиск/сортировка работают на всём каталоге без полной загрузки DOM.
-5. Секция не видна, если хост-половина не смонтирована (правило слотов-карточек).
-6. ru/en подписи через `ctx.locale`; валюта USD явно помечена в шапке.
-7. Плагин ставится в чистый web-профиль одной командой и удаляется без следов
-   (кроме кэш-файла в его storage).
+1. On the Models settings page, below the provider rows, a section displays prices for
+   at least three real configured providers plus the catalog's first-screen list, with
+   correct input/output/cache numbers.
+2. Removing network access does not break the section: the fallback chain (cache →
+   embedded snapshot) is in effect and each displayed number labels its source and age.
+3. Refresh and the TTL update the data; provider-topology events re-evaluate the
+   "Only mine" view.
+4. Search, filters, and sorting work against the full catalog without loading
+   everything into the DOM.
+5. The section is absent when the Host half is not mounted (standard slot behavior).
+6. All labels are localized (English and Russian); the USD unit is stated explicitly.
+7. The plugin installs into a fresh web profile with one command and uninstalls without
+   residue other than its own cache file.
 
-## 4. Не-цели
+## 4. Non-goals
 
-- Биллинговая точность: провайдеры округляют по-своему, кэш-политики различаются —
-  всё помечается как оценка.
-- Конвертация в рубли/другие валюты, история цен, бюджеты/лимитты, team-отчётность.
-- TUI/SDK-поверхности (только web-клиент).
-- Автоматический подбор модели за пользователя.
-- Авто-скрейпинг промо-страниц провайдеров (только курируемый файл B3).
+- Billing accuracy. Providers round differently and cache policies differ; every figure
+  is explicitly an estimate.
+- Currency conversion, price history, budgets, spending limits, team reporting.
+- Terminal (TUI), SDK, or ACP surfaces. The web client only.
+- Automatic model selection on the user's behalf.
+- Scraping provider promotion pages. Promotions come only from the curated feed (B3).
 
-## 5. Риски
+## 5. Risks
 
-| Риск | Митигация |
-|------|-----------|
-| Формат models.dev поплывёт | строгая валидация полей + опциональность всего, падение на pi-catalog |
-| 4.5 МБ в браузер | prune на хосте (только нужные поля/провайдеры), пагинация по алфавиту эпика A9 |
-| Remote-генерация вне репо (Q1) | решить в архитектуре; есть 2 запасных транспорта (E2) |
-| «Сильные стороны» из description — маркетинговый шум | теги только из структурированных полей (A3), description — в tooltip |
-| Расхождение цен pi-catalog vs models.dev | приоритет pi-catalog для подключённых маршрутов; расхождение >X% показывать иконкой ⚠ |
-| Протухшие промо в curated-файле | обязательный `until`/`verified_at`, авто-гашение (B4) |
+| Risk | Mitigation |
+|------|------------|
+| models.dev schema drift | strict validation with optional fields; degrade to the last cached or embedded snapshot; fixed test fixture guards the parser |
+| 4.5 MB payload reaching the browser | host-side pruning, per-provider folds, server-side ETag caching |
+| Out-of-tree packaging constraints (bundle format, purity rules) | confirmed by spikes before implementation; see `spike/RESULTS.md` |
+| Catalog descriptions are marketing text | tags derive only from structured fields (A3); descriptions live in tooltips |
+| pi-ai catalog and models.dev disagree | pi-ai wins for routes the user can actually call; disagreement above 10% shows a warning icon with both values |
+| Stale curated promotions | mandatory `until` and `verifiedAt` fields; automatic expiry (B4); CI validation |
 
-## 6. Open Questions
+## 6. Decisions and open questions
 
-- ~~Q1: транспорт Host→Client~~ — **закрыт**: webServer-роут + embedded-снапшот (E2).
-- ~~Q2: промо-файл~~ — **закрыт**: `promos/` в этом репо, вклад через PR + CI-компиляция фида (B3).
-- ~~Q3: правила тегирования~~ — **закрыт**: настраиваемые, дефолты в пакете (A3).
-- ~~Q4: blended-метрика~~ — **закрыт (решение модели)**: перенесена в P1 вместе с B1; в MVP сортировка по $out (A6).
-- Q5 (открыт): есть ли seam в stats-стрипе/композере для D2 без форка чужих пакетов (слота там нет) — проверить в M3.
-- Q6 (закрыт с хвостом): атрибуция — источник+дата на каждой строке (A2) и в README; **задача перед первым релизом**: проверить лицензию models.dev на редистрибуцию прореженного снапшота внутри npm-пакета (в UI-тоoltips это не меняет).
-
-Детали архитектуры: [architecture.md](architecture.md).
+- **Q1 (closed) — transport:** Host HTTP route plus embedded build-time snapshot
+  fallback (E2). A typed Remote API remains the future upgrade path.
+- **Q2 (closed) — promotions:** `promos/` in this repository, contributions via pull
+  requests, CI-validated and compiled feed (B3).
+- **Q3 (closed) — tag rules:** configurable, defaults shipped, user extend/override
+  via settings (A3).
+- **Q4 (closed) — blended price metric:** deferred to P1 together with B1; v0.1 sorts
+  by output price (A6).
+- **Q5 (open):** whether the chat stats strip offers a supported extension point for
+  the session-cost display (D2); to be checked in M3.
+- **Q6 (closed with follow-up):** attribution is shown per row (source + date) and in
+  the README. Before the first public release: confirm the models.dev license permits
+  redistributing a pruned snapshot inside the npm package.

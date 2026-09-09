@@ -1,70 +1,82 @@
-# Spike results
+# Spike Results
 
-Прогон: 2026-09-09, DSH 0.1.2-rc.1 (npx-установка), macOS, node v25.
-Два стенда: **live** (`dsh web` на :3080 — GUI этой сессии, `patchReload: live`)
-и **клон** (одноразовый `DSH_HOME=/tmp/dsh-probe-home dsh web --port 3099`).
+Platform-validation experiments run 2026-09-09 against the installed DSH
+0.1.2-rc.1 (npx installation) on macOS, Node v25. Two test beds:
 
-## S3 — webServer-роут из out-of-tree плагина: ✅ PASS
+- **Live** — the `dsh web` server of this workspace on `127.0.0.1:3080`, with
+  `patchReload: live` on the web profile.
+- **Clone** — a disposable server with an isolated home:
+  `DSH_HOME=/tmp/dsh-probe-home dsh web --port 3099`.
 
-- `spike/src/pricing-host.js` — ESM `.js`, `apply` → `ctx.inject(['webServer'])`
-  → `webServer.register({kind:'exact', path, handler})`, disposer через `ctx.effect`.
-- Монтаж absolute-path insert'ом в `~/.dsh/profiles/web/cordis.patch.yml`.
-- Live-релоад патча: роут поднялся без рестарта, `200` + JSON; откат (`[]`) → `404`.
+## S3 — named HTTP route from an out-of-tree plugin: PASS
 
-## S1 — клиентский бандл принимается dsh-client-modules: ✅ PASS (серверная часть)
+- Plugin: `spike/src/pricing-host.js` — plain ESM JavaScript; `apply(ctx)` →
+  `ctx.inject(['webServer'], ...)` → `webServer.register({ kind: 'exact', path:
+  '/model-pricing/snapshot', handler })`; the returned disposer is attached through
+  `ctx.effect`.
+- Mounted by an absolute-path entry in `~/.dsh/profiles/web/cordis.patch.yml`.
+- Live patch reload applied without restarting the server or losing the running
+  sessions; `curl` returned `200` with JSON. Reverting the patch removed the route
+  within seconds; the application stayed healthy.
+- Conclusion: architecture §2 (transport = named route) is confirmed. The route
+  registry treats out-of-tree plugins exactly like DSH's own feature plugins.
 
-Стенд: клон, пакет `spike/client-spike2` (name `dsh-model-pricing-spike2`,
-exports `.`/`./client`, `dsh.client {platform: web, inject: [settings-models]}`),
-смонтирован патчем **по имени пакета** (`name: dsh-model-pricing-spike2`).
+## S1 — client bundle accepted by the module system: PASS (server-side)
 
-- Хост-половина смонтирована при буте (маркеры в `/tmp/spike2.log`: module
-  evaluated → apply ran → route registered), probe-роут `200`.
-- `GET /` (с auth-cookie из boot-token) → в index есть комбо-строка
-  `/plugins/??…46 ртов…,dsh-model-pricing-spike2/client.js&rev=…` — **наш бандл в
-  графе**, 46 фабрик скачиваются одним curl'ом, `id: "dsh-model-pricing-spike2"`
-  внутри совпадает с именем пакета.
-- Формат `window.__ModuleLoader__.load({id, factory:(require)=>{…exports…}})`
-  принят без ошибок; внешних `require("react")` достаточно (реакт в графе есть).
+Test bed: clone; package `spike/client-spike2` (name `dsh-model-pricing-spike2`;
+`exports` map with `.` and `./client`; `dsh.client` declaring `platform: "web"` and
+`inject: ["@deepseek-ai/dsh-client-ui-settings-models"]`); mounted by package name
+through the profile patch.
 
-Не доказано серверной частью: рендер слота в браузере (см. S2 — проверка глазами).
+- Host half loaded at boot (marker sequence in `/tmp/spike2.log`: module evaluated →
+  apply ran → webServer available → route registered, probe answered `200`).
+- The authenticated index contains the module graph; our `client.js` appears in the
+  served combo URL and is downloadable (`46` factory registrations in the batch
+  response, including ours with a matching `id`).
+- Bundle format: `window.__ModuleLoader__.load({ id, factory })` where the factory's
+  `id` must equal the package name; third-party imports (`react`) go through the
+  factory's `require`. The format is reproducible from the installed reference
+  artifact at `@deepseek-ai/dsh-client-ui-settings-models/lib/client.js`.
 
-## S2 — порядок монтирования и рендер в footer-слот: 🟡 ждёт eyeball-проверки
+Not covered server-side: actual slot rendering in a browser (see S2).
 
-- Порядок в графе доказан: наша строка идёт после `dsh-client-ui-settings-models`
-  (позиции 18 → 45 в комбо и после него в preload-реестре) — `dsh.client.inject`
-  отработал как документировано.
-- Сам `<div>⚡ spike</div>` в Settings → Models ниже карточек видно только из
-  браузера: открыть на клоне `http://127.0.0.1:3099/?<boot-token>` → Settings →
-  Models → прокрутить в футер.
+## S2 — slot mount order and rendering: PARTIAL (one manual check pending)
 
-## S4 — как ставить пакет: ⚠️ нюанс live-монтажа
+- Order is proven by the graph: our row follows
+  `@deepseek-ai/dsh-client-ui-settings-models` (positions 18 → 45 in the combo), so
+  the footer slot exists when our `apply` registers into it. `dsh.client.inject`
+  behaves as documented.
+- Remaining: visual confirmation that a component registered into
+  `settings.models.footer` renders below the provider rows. Method: open the clone
+  URL, Settings → Models, scroll to the bottom, expect the spike placeholder box.
 
-- `dsh plugin --profile web add <dir>` → pnpm-link в node_modules профиля;
-  пакет **не** попадает в `dsh.profile.bundles` без `dsh.bundle` манифеста
-  (warning у команды дословный: «installed as a plain dependency, not a
-  profile layer»).
-- Монтаж по имени пакета работает при **буте**; вживую в долгоживущем live
-  экземпляре runtime-patch insert по bare-name **не смонтировался** (probe 404,
-  маркеров нет), хотя абсолютный path-монтаж в том же live поднимался.
-- Практический вывод для dev-цикла: после `dsh plugin add` + патча по имени —
-  рестарт сервера; live-редактирование допустимо только path-монтажом.
-- Бонус-наблюдение платформы: ESM-модуль path-смонтированного плагина
-  переживает перезапись файла (кэш по URL): после смены кода нужен новый id+путь
-  либо рестарт; также live-релоад патча выбирается с неровной задержкой
-  (единицы–десятки секунд) и частые перезаписи патча гонятся друг с другом.
+## S4 — installation and mounting semantics: NOTE
 
-## Итог для архитектуры
+- `dsh plugin --profile web add <dir>` installs a pnpm link dependency. The package
+  is **not** activated as a profile layer unless its manifest declares
+  `dsh.bundle` ("installed as a plain dependency, not a profile layer" — the
+  literal CLI warning). A `cordis.patch.yml` insert then references it by name or by
+  absolute path.
+- Mounting by package name resolves at server start. In the long-running live
+  instance, a runtime patch insert by bare package name did not mount (probe 404, no
+  markers) although the same package mounted cleanly in the clone at boot.
+  Absolute-path mounts did work live.
+- Live-reloaded path-mounted modules are cached by module URL: rewriting a plugin
+  file's contents is not re-imported; use a new file name or restart.
+- Practical development loop: restart the server for package-name mounts; iterate
+  live with path mounts using fresh file names.
 
-Ставка §2 architecture.md (host-роут + out-of-tree dual-face пакет + client
-scan) подтверждена end-to-end на уровне сервера; браузерный шаг — один клик
-пользователя. Никаких блокирующих неизвестных не осталось; S5 (typert-кодоген)
-по-прежнему отложен до M3.
+## Summary for the architecture
 
-## Артефакты
+The core bets of architecture §2 hold: an out-of-tree dual-face package can register
+a host HTTP route, and its browser bundle is discovered, graph-ordered, and served by
+DSH's module system. The only remaining unknown is a thirty-second visual check.
+S5 (typed Remote code generation outside the repository) stays deferred to M3.
 
-- `spike/src/pricing-host.js` — S3 хост-роут (— live-проверка пройдена).
-- `spike/client-spike2/` — S1/S2 dual-face пакет (host с probe-роутом и
-  логированием в `/tmp/spike2.log`; client — div в footer-слот).
-- Стенд-клон: убить `pkill -f 'dsh.*--port 3099'`; домашний каталог
-  `/tmp/dsh-probe-home` — смывать руками.
-- Профиль live-сервера после экспериментов возвращён к `[]` (проверить!).
+## Artifacts
+
+- `spike/src/pricing-host.js` — S3 host-route plugin.
+- `spike/client-spike2/` — S1/S2 package: host half with probe route and file
+  logging; client half rendering a placeholder into `settings.models.footer`.
+- Clone cleanup: `pkill -f 'dsh.*--port 3099'`; remove `/tmp/dsh-probe-home`.
+- The live profile's `cordis.patch.yml` was reset to `[]` after the experiments.
