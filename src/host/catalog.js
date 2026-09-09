@@ -224,6 +224,8 @@ export function attachPromos(rows, promos) {
   for (const [key, list] of byProviderKey) {
     const sorted = [...list].sort((a, b) => Date.parse(a.until) - Date.parse(b.until))
     providerOffers[key] = {
+      // Best-effort display name: the original provider string as contributed.
+      provider: sorted[0]?.provider ?? key,
       count: sorted.length,
       until: sorted[0]?.until,
       offers: sorted.map((p) => ({

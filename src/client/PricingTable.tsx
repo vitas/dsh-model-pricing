@@ -53,6 +53,7 @@ const s = {
   table: { width: '100%', borderCollapse: 'collapse' } as React.CSSProperties,
   th: (align: 'left' | 'right'): React.CSSProperties => ({ textAlign: align, padding: '4px 8px', fontSize: 11, color: 'var(--dsw-alias-label-tertiary)', fontWeight: 500, cursor: 'pointer', userSelect: 'none' }),
   td: (align: 'left' | 'right'): React.CSSProperties => ({ textAlign: align, padding: '4px 8px', borderTop: '1px solid var(--dsw-alias-border-l1)', fontVariantNumeric: 'tabular-nums' }),
+  promoPanel: { margin: '8px 0', padding: '8px 10px', border: '1px solid var(--dsw-alias-border-l2)', borderRadius: 8, background: 'var(--dsw-alias-bg-secondary)', fontSize: 13 },
   badge: { fontSize: 11, padding: '0 6px', borderRadius: 10, border: '1px solid var(--dsw-alias-border-l2)', marginRight: 4, whiteSpace: 'nowrap' as const },
   detail: { padding: '8px 12px', background: 'var(--dsw-alias-bg-layer-1)', color: 'var(--dsw-alias-label-secondary)', fontSize: 12, whiteSpace: 'pre-wrap' } as React.CSSProperties,
 }
@@ -223,6 +224,7 @@ export function PricingTable({ store }: { store: Store }) {
           {filters.grouping === 'provider' ? tr('groupProvider') : tr('groupFlat')}
         </button>
       </div>
+      <ProviderPromoPanel store={store} />
       {rows.length === 0 && <div style={s.status}>{tr('emptyFilter')}</div>}
       {[...groups.entries()].map(([g, grows]) => {
         const open = filters.grouping === 'flat' || openGroups.has(g)
@@ -262,6 +264,42 @@ export function PricingTable({ store }: { store: Store }) {
  * models.dev provider id. Prices stay list prices — the badge says where the
  * provider stands in the catalog, nothing more.
  */
+/**
+ * Whole-provider promotions panel. Lists every provider with active
+ * community-contributed offers at the top of the table, including gateways
+ * (e.g. B.AI) that have no rows in the pricing catalog — this is the answer to
+ * "where are the current promotions" and links each offer to its source.
+ */
+export function ProviderPromoPanel({ store }: { store: Store }) {
+  const state = useSyncExternalStore(store.subscribe, store.getState)
+  const entries = state.payload ? store.allProviderOffers() : []
+  if (entries.length === 0) return null
+  entries.sort((a, b) => a[1].provider.localeCompare(b[1].provider))
+  return (
+    <div style={s.promoPanel} title={tr('promoPanelHint')}>
+      <strong style={{ color: 'var(--dsw-alias-brand-primary)' }}>{tr('promoPanel')}</strong>
+      {entries.map(([key, group]) => (
+        <div key={key} style={{ marginTop: 4 }}>
+          <span style={{ fontWeight: 600 }}>{group.provider}</span>
+          <span style={{ color: 'var(--dsw-alias-label-secondary)' }}> — {tr('promoCount', { n: group.count })}</span>
+          {group.offers.slice(0, 4).map((o, i) => (
+            <span key={i} style={{ display: 'block', fontSize: 12, color: 'var(--dsw-alias-label-primary)' }}>
+              {o.model && <span style={{ color: 'var(--dsw-alias-label-secondary)' }}>{o.model}: </span>}
+              {o.url ? (
+                <a href={o.url} target="_blank" rel="noreferrer noopener" style={{ color: 'inherit' }}>{o.promo}</a>
+              ) : o.promo}
+              <span style={{ color: 'var(--dsw-alias-label-tertiary)' }}>{` · ${tr('promoUntil', { until: o.until })}`}</span>
+            </span>
+          ))}
+          {group.offers.length > 4 && (
+            <span style={{ display: 'block', fontSize: 12, color: 'var(--dsw-alias-label-secondary)' }}>{tr('promoMore', { n: group.offers.length - 4 })}</span>
+          )}
+        </div>
+      ))}
+    </div>
+  )
+}
+
 /** Multi-line tooltip: one row per active offer, plus provenance. */
 function offersTitle(offers: { offers: { model?: string; promo: string; until: string; verifiedAt: string; by: string }[] }): string {
   return offers.offers

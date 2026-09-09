@@ -144,6 +144,13 @@ export function createStore(fallback: PricingPayload | null) {
     return rows
   }
 
+  /** Every provider that has active whole-provider offers, for the summary panel. */
+  function allProviderOffers(): [string, import('./types.js').ProviderOffers][] {
+    const map = state.payload?.promotions?.providerOffers
+    if (!map) return []
+    return Object.entries(map)
+  }
+
   /**
    * Active community offers for a provider, keyed by the normalized id
    * (lowercase alphanumeric). Covers providers absent from the pricing catalog
@@ -203,7 +210,8 @@ export function createStore(fallback: PricingPayload | null) {
     getState: () => state,
     visibleRows,
     providerSummary,
-    providerOffers,
+      allProviderOffers,
+  providerOffers,
     allTags,
     setFilters,
     setCollapsed(collapsed: boolean) {

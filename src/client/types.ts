@@ -31,6 +31,8 @@ export interface ProviderOffer {
 }
 
 export interface ProviderOffers {
+  /** Original provider id as contributed (display; keys are normalized). */
+  provider: string
   count: number
   /** Earliest expiry among the provider's active offers. */
   until?: string
