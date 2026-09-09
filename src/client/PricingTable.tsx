@@ -79,11 +79,22 @@ export function StatusLine({ store }: { store: Store }) {
 
 function Row({ row, expanded, onToggle, configured }: { row: PricingRow; expanded: boolean; onToggle: () => void; configured: boolean }) {
   const divergent = row.sources.some((x) => x.divergent)
+  const cmp = row.compare
   return (
     <>
       <tr onClick={onToggle} style={{ cursor: 'pointer' }}>
         <td style={s.td('left')}>
           {configured ? '● ' : ''}{row.name}{' '}
+          {cmp?.cheapest && (
+            <span title={`Cheapest of ${cmp.providers} providers carrying this model`}
+              style={{ ...s.tagChip, color: 'var(--dsw-alias-state-success-primary)', borderColor: 'var(--dsw-alias-state-success-primary)' }}>cheapest · {cmp.providers}×
+            </span>
+          )}
+          {cmp && !cmp.cheapest && cmp.pctOver != null && cmp.pctOver >= 10 && (
+            <span title={`Same model on ${cmp.providers} providers; this route costs ${String(cmp.pctOver)}% more (by output price)`}
+              style={{ ...s.tagChip, color: 'var(--dsw-alias-label-tertiary)' }}>+{cmp.pctOver}% vs {cmp.cheapestProvider}
+            </span>
+          )}
           {divergent && <span title="catalog price differs from your route by >10%" style={{ color: 'var(--dsw-alias-state-warn-primary)' }}>⚠</span>}
         </td>
         <td style={s.td('right')}>{money(row.cost.input)}</td>

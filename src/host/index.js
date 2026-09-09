@@ -11,7 +11,7 @@
 
 import { createHash } from 'node:crypto'
 import { gzipSync } from 'node:zlib'
-import { DEFAULT_SOURCE_URL, fetchModelsDev, pruneModelsDev } from './catalog.js'
+import { DEFAULT_SOURCE_URL, annotateComparisons, fetchModelsDev, pruneModelsDev } from './catalog.js'
 
 
 const PLUGIN_ID = 'dsh-model-pricing'
@@ -125,6 +125,7 @@ export async function apply(ctx, config = {}) {
     const { rows, stats } = pruneModelsDev(doc, tagRulesConfig)
     const pi = await loadPiAiCatalog()
     mergePiAi(rows, pi)
+    annotateComparisons(rows)
     const payload = {
       generatedAt: new Date().toISOString(),
       ttlSeconds: Math.round(ttlMs / 1000),

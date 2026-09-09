@@ -81,6 +81,58 @@ export function pruneModelsDev(document, tagRulesConfig) {
   return { rows, stats: { providers, models, priced: rows.length } }
 }
 
+/**
+ * Cross-provider comparison (feature A2). Groups rows that are the same model
+ * served by different providers (canonical model-id after stripping provider
+ * prefixes, version pins and date suffixes), then annotates each row in a
+ * multi-provider group with `compare`: the cheapest route (by output price — the
+ * v0.1 metric; blended cost is P1 per decision Q4) and how far above the
+ * cheapest the row sits. Pure; called once per snapshot build.
+ */
+export function annotateComparisons(rows) {
+  const canonical = (modelId) => {
+    let id = String(modelId).toLowerCase()
+    const slash = id.lastIndexOf('/')
+    if (slash >= 0) id = id.slice(slash + 1) // openrouter-style provider prefix
+    id = id.replace(/[:@]\w+$/, '') // bedrock-style version pins (":0", "@20250805")
+    id = id.replace(/-20\d{6}$/, '') // release-date suffixes
+    id = id.replace(/[^a-z0-9]+/g, '')
+    return id
+  }
+  const groups = new Map()
+  for (const row of rows) {
+    const key = canonical(row.modelId)
+    if (key.length < 5) continue
+    if (!groups.has(key)) groups.set(key, [])
+    groups.get(key).push(row)
+  }
+  for (const group of groups.values()) {
+    const byProvider = new Map()
+    for (const row of group) {
+      const existing = byProvider.get(row.provider)
+      if (!existing || effPrice(row) < effPrice(existing)) byProvider.set(row.provider, row)
+    }
+    if (byProvider.size < 2) continue
+    const winners = [...byProvider.values()].sort((a, b) => effPrice(a) - effPrice(b))
+    const best = winners[0]
+    for (const row of group) {
+      const price = effPrice(row)
+      const ratio = effPrice(best) > 0 && Number.isFinite(price) ? price / effPrice(best) : NaN
+      row.compare = {
+        providers: byProvider.size,
+        cheapest: row === best,
+        pctOver: Number.isFinite(ratio) ? Math.round((ratio - 1) * 100) : undefined,
+        cheapestProvider: best.providerName,
+      }
+    }
+  }
+  return rows
+}
+
+function effPrice(row) {
+  return row.cost.output ?? row.cost.input ?? Number.POSITIVE_INFINITY
+}
+
 /** Fetch the catalog source. Node global fetch; 30 s budget. */
 export async function fetchModelsDev(url = DEFAULT_SOURCE_URL) {
   const response = await fetch(url, {

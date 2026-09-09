@@ -9,7 +9,7 @@
 import { writeFileSync, mkdirSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
-import { fetchModelsDev, pruneModelsDev } from '../src/host/catalog.js'
+import { annotateComparisons, fetchModelsDev, pruneModelsDev } from '../src/host/catalog.js'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const MAX_PROVIDERS = 12
@@ -17,6 +17,9 @@ const MAX_MODELS_PER_PROVIDER = 28
 
 const doc = await fetchModelsDev()
 const { rows, stats } = pruneModelsDev(doc)
+// Annotate on the full catalog first, so cross-provider comparison is correct
+// even after the offline subset is trimmed below.
+annotateComparisons(rows)
 
 // Keep the largest providers so the offline table still covers mainstream models.
 const byProvider = new Map()

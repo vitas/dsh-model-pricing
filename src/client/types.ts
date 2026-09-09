@@ -42,6 +42,8 @@ export interface PricingRow {
   status?: string
   experimental?: boolean
   authoritative?: string
+  /** Cross-provider comparison for the same model (A2); present in multi-provider groups. */
+  compare?: { providers: number; cheapest: boolean; pctOver?: number; cheapestProvider?: string }
 }
 
 export interface PricingPayload {
