@@ -138,17 +138,22 @@ Metrics: 32 px rows; 15 px semibold section heading matching page cards; tabular
 figures (`font-variant-numeric: tabular-nums`); monospaced price column; horizontal
 padding aligned with the provider cards.
 
-## 8. Copy (English; Russian mirrors the same keys)
+## 8. Copy
+
+Keys are implemented in `src/client/locales.ts` with balanced `en`, `zh`, and
+`ru` dictionaries (the platform translate function resolves the active language
+with a per-key fallback chain ending at English; see feature-map §6 for the
+localization decision). Reference copy:
 
 | Key | English |
 |-----|---------|
-| section.title | Model pricing |
-| status.updated | updated {relative} |
-| status.source.bundled | bundled snapshot · built {date} |
-| status.est | estimates, not billing |
-| group.from | from {min} / {max} per 1M |
-| empty.filters | No models match — Clear filters |
-| badge.stale | stale |
+| title | Model pricing |
+| updated | updated {age} |
+| builtOn | bundled snapshot ({coverage}) · built {date} |
+| estimates | estimates, not billing |
+| fromRange | from {input} / {output} per 1M |
+| emptyFilter | No models match the current filters. |
+| stale | stale |
 | promo.until | until {date} |
 
 ## 9. Accessibility

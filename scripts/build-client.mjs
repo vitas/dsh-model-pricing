@@ -26,6 +26,7 @@ const result = await build({
   target: 'es2020',
   jsx: 'automatic',
   external: ['react', 'react/jsx-runtime'],
+  charset: 'utf8',
   loader: { '.json': 'json' },
   minify: process.env.NODE_ENV === 'production',
 

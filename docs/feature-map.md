@@ -120,7 +120,10 @@ Releases: v0.1 = Epics A + E; v0.2 = Epic B (automatic part) + Epic C; v0.3 = Ep
 4. Search, filters, and sorting work against the full catalog without loading
    everything into the DOM.
 5. The section is absent when the Host half is not mounted (standard slot behavior).
-6. All labels are localized (English and Russian); the USD unit is stated explicitly.
+6. All labels are localized. The harness UI itself ships English and Chinese; the
+   plugin registers both plus an added Russian language pack, so a Russian browser
+   can select and render `ru` (decision recorded in §6). The USD unit is stated
+   explicitly.
 7. The plugin installs into a fresh web profile with one command and uninstalls without
    residue other than its own cache file.
 
@@ -159,3 +162,10 @@ Releases: v0.1 = Epics A + E; v0.2 = Epic B (automatic part) + Epic C; v0.3 = Ep
 - **Q6 (closed with follow-up):** attribution is shown per row (source + date) and in
   the README. Before the first public release: confirm the models.dev license permits
   redistributing a pruned snapshot inside the npm package.
+- **Q7 (closed) — localization:** the DSH browser locale service ships two built-in
+  locales, English and Chinese (verified in `@deepseek-ai/dsh-client-locale`:
+  `LOCALE_IDS = ["zh", "en"]`); Russian is not a platform language. The plugin
+  registers `en`/`zh` dictionaries for its namespace and additionally contributes
+  Russian as a selectable language pack via `ctx.locale.addLanguage({ id: 'ru' })`,
+  with per-key fallback to English. Users of the Russian browser get Russian
+  without any patching of the harness.
