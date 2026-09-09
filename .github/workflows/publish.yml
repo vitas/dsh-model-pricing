@@ -1,0 +1,31 @@
+name: publish
+# Trusted publishing (OIDC) for npm: publishing on a GitHub release, with npm
+# provenance and no stored token. One-time setup on npmjs.com (logged in on the
+# website): Account -> Security & Sign-In -> Trusted Publishing -> New publisher:
+# GitHub, owner `vitas`, repository `dsh-model-pricing`, workflow file
+# `publish.yml`, no branch or environment filter.
+on:
+  release:
+    types: [published]
+
+jobs:
+  npm:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # required for npm OIDC trusted publishing
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          # registry-url intentionally omitted: with no token configured, npm
+          # uses the OIDC id-token (the default registry is npmjs.org anyway)
+      - name: Remove any token-based npmrc (trusted publishing must not race it)
+        run: rm -f "$HOME/.npmrc"
+      - name: Build package artifacts
+        run: npm ci && npm run prepack
+      - name: Publish to npm
+        # No credentials configured on purpose: npm exchanges the OIDC id-token
+        # for a short-lived publish token (trusted publishing + provenance).
+        run: npm publish --access public --provenance --ignore-scripts

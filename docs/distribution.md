@@ -74,16 +74,27 @@ interstitials.
 
 ## Release process
 
+Publishing uses npm **trusted publishing (OIDC)**: there is no stored token and
+no two-factor code to enter, because the GitHub Actions job authenticates to the
+npm registry with a short-lived OIDC token. Requires the one-time "Trusted
+Publishing" registration on npmjs.com described in `.github/workflows/publish.yml`.
+
 1. `npm run snapshot && npm run build` (generates `data/snapshot.json`, `lib/client.js`).
-2. Version bump + `CHANGELOG.md` entry + `git tag v0.1.0` + push.
-3. GitHub Release created from the tag (release notes double as announcement copy).
-4. `npm publish` (requires an `npm login` on this account; the name
-   `dsh-model-pricing` was confirmed unclaimed on 2026-09-09). **Done: v0.1.0
-   published 2026-09-09 under the `samebits` npm account.**
+2. Version bump + `CHANGELOG.md` entry + `git tag vX.Y.Z` + `git push --follow-tags`.
+3. GitHub Release created from the tag; publishing is **triggered by the release**
+   (`.github/workflows/publish.yml` runs `npm publish --provenance`), so the npm
+   package is signed with provenance and attributed to this repository.
+4. Confirm the `publish` workflow is green and `npm view dsh-model-pricing` shows
+   the new version.
 5. PR to awesome-dsh-plugin with the single `data/plugins/vitas__dsh-model-pricing.yml`
    file (content prepared in `packaging/awesome-dsh-plugin.yml`; hold until the
    repository-age check window has passed and submit as one clean PR).
 6. Post-release announcements (channel list above).
+
+> History: `v0.1.0` was published 2026-09-09 under the `samebits` npm account via
+> an interactive `npm login` (a one-time password was required at publish time).
+> npm has since deprecated two-factor-bypassing access tokens for direct
+> publishing, so `v0.2.0` and later move to the trusted-publishing flow above.
 
 ## Repository hygiene that discovery depends on
 
