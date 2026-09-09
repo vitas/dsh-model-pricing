@@ -6,6 +6,7 @@
 input/output/cache prices, context window, coding/agentic/vision/long-context tags,
 and which reachable route is cheapest for the same model right now.
 
+[![npm](https://img.shields.io/npm/v/dsh-model-pricing)](https://www.npmjs.com/package/dsh-model-pricing)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
 [![stars](https://img.shields.io/github/stars/vitas/dsh-model-pricing?style=social)](https://github.com/vitas/dsh-model-pricing)
 [![dsh plugin](https://img.shields.io/badge/dsh--plugin-ready-informational)](https://github.com/deepseek-ai/deepseek-harness)
@@ -39,7 +40,15 @@ your own machine.
 
 ## Install
 
-From source (works today):
+```sh
+dsh plugin --profile web add dsh-model-pricing
+```
+
+Restart `dsh web` and open **Settings → Models**: the pricing table appears at the
+bottom of the page. The plugin needs no configuration; first load fetches the
+catalog and caches it locally.
+
+From source (for development):
 
 ```sh
 git clone https://github.com/vitas/dsh-model-pricing.git
@@ -47,15 +56,6 @@ cd dsh-model-pricing
 npm install && npm run snapshot && npm run build
 dsh plugin --profile web add .
 ```
-
-After publishing to npm:
-
-```sh
-dsh plugin --profile web add dsh-model-pricing
-```
-
-Either way, restart `dsh web` and open **Settings → Models**: the pricing table
-appears at the bottom of the page.
 
 ## Privacy and data sources
 

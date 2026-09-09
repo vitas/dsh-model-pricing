@@ -78,9 +78,11 @@ interstitials.
 2. Version bump + `CHANGELOG.md` entry + `git tag v0.1.0` + push.
 3. GitHub Release created from the tag (release notes double as announcement copy).
 4. `npm publish` (requires an `npm login` on this account; the name
-   `dsh-model-pricing` was confirmed unclaimed on 2026-09-09).
+   `dsh-model-pricing` was confirmed unclaimed on 2026-09-09). **Done: v0.1.0
+   published 2026-09-09 under the `samebits` npm account.**
 5. PR to awesome-dsh-plugin with the single `data/plugins/vitas__dsh-model-pricing.yml`
-   file.
+   file (content prepared in `packaging/awesome-dsh-plugin.yml`; hold until the
+   repository-age check window has passed and submit as one clean PR).
 6. Post-release announcements (channel list above).
 
 ## Repository hygiene that discovery depends on
