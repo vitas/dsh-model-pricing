@@ -108,6 +108,21 @@ function etagOf(payload) {
 export const name = PLUGIN_ID
 export const inject = []
 
+/** Settings namespace the plugin registers with DSH's settings service. */
+const SETTINGS_NS = 'model-pricing'
+
+/**
+ * Coerce a raw config object (composition entry or resolved settings section)
+ * into the effective values the catalog pipeline consumes.
+ */
+function normalizeSettings(raw = {}) {
+  return {
+    sourceUrl: typeof raw.sourceUrl === 'string' && raw.sourceUrl ? raw.sourceUrl : DEFAULT_SOURCE_URL,
+    ttlMs: Number.isFinite(raw.ttlMinutes) && raw.ttlMinutes > 0 ? raw.ttlMinutes * 60_000 : DEFAULT_TTL_MS,
+    tagRules: raw.tagRules,
+  }
+}
+
 /**
  * Plugin entry. Reads optional config, wires the catalog cache, and registers the
  * two routes through DSH's webServer seam.
@@ -115,24 +130,58 @@ export const inject = []
  * @param config - profile patch config (`ttlMinutes`, `sourceUrl`, `tagRules`).
  */
 export async function apply(ctx, config = {}) {
-  const sourceUrl = typeof config.sourceUrl === 'string' ? config.sourceUrl : DEFAULT_SOURCE_URL
-  const ttlMs = Number.isFinite(config.ttlMinutes) ? config.ttlMinutes * 60_000 : DEFAULT_TTL_MS
-  const tagRulesConfig = config.tagRules
+  /** Effective configuration: composition entry until the settings service attaches. */
+  let settings = normalizeSettings(config)
+  /** Key of the config the current snapshot was built from (catalog-affecting fields). */
+  let builtKey = JSON.stringify({ sourceUrl: settings.sourceUrl, tagRules: settings.tagRules ?? null })
 
+  /**
+   * Live configuration via DSH's settings service (E3). The namespace mirrors the
+   * composition entry as its base layer; user edits in settings.yaml win and take
+   * effect without a restart — catalog-affecting fields trigger a rebuild on the
+   * next request, TTL applies immediately. Without the service (or schemastery in
+   * a bare dev environment) the plugin keeps working exactly as composed.
+   */
   /** @type {{ payload: object, etag: string, fetchedAt: number, fromCache: boolean } | null} */
   let snapshot = null
   let inflight = null
 
+  try {
+    const { default: z } = await import('@deepseek-ai/schemastery')
+    const schema = z.object({
+      sourceUrl: z.string().default(DEFAULT_SOURCE_URL),
+      ttlMinutes: z.number().default(Math.round(DEFAULT_TTL_MS / 60_000)),
+      tagRules: z.any(),
+    })
+    ctx.inject(['settings'], (c) => {
+      let source = () => config
+      c.settings.installSection(ctx, SETTINGS_NS, schema, config, {
+        setSource: (current) => {
+          source = current
+        },
+        onChange: () => {
+          const next = normalizeSettings(source())
+          settings = next
+          const nextKey = JSON.stringify({ sourceUrl: next.sourceUrl, tagRules: next.tagRules ?? null })
+          if (nextKey !== builtKey) snapshot = null // forces a rebuild on the next request
+        },
+      })
+    })
+  } catch {
+    // schemastery or the settings seam unavailable — entry config stays authoritative
+  }
+
   async function build() {
-    const doc = await fetchModelsDev(sourceUrl)
-    const { rows, stats } = pruneModelsDev(doc, tagRulesConfig)
+    const doc = await fetchModelsDev(settings.sourceUrl)
+    const { rows, stats } = pruneModelsDev(doc, settings.tagRules)
     const pi = await loadPiAiCatalog()
     mergePiAi(rows, pi)
     annotateComparisons(rows)
+    builtKey = JSON.stringify({ sourceUrl: settings.sourceUrl, tagRules: settings.tagRules ?? null })
     const payload = {
       generatedAt: new Date().toISOString(),
-      ttlSeconds: Math.round(ttlMs / 1000),
-      source: { name: 'models.dev', url: sourceUrl },
+      ttlSeconds: Math.round(settings.ttlMs / 1000),
+      source: { name: 'models.dev', url: settings.sourceUrl },
       stats,
       providers: { configured: configuredProviders() },
       rows,
@@ -154,7 +203,7 @@ export async function apply(ctx, config = {}) {
   }
 
   function stale() {
-    return snapshot === null || Date.now() - snapshot.fetchedAt > ttlMs
+    return snapshot === null || Date.now() - snapshot.fetchedAt > settings.ttlMs
   }
 
   /** Disk cache location: under DSH_HOME when set, else `~/.dsh`, else temp. */
