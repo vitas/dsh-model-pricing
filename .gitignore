@@ -1,0 +1,17 @@
+# deps
+node_modules/
+.pnpm-store/
+
+# build output
+lib/
+dist/
+*.tsbuildinfo
+
+# local/runtime
+.cache/
+*.log
+.DS_Store
+
+# editor
+.idea/
+.vscode/
