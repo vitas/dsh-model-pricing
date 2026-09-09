@@ -193,13 +193,14 @@ export async function apply(ctx, config = {}) {
     const pi = await loadPiAiCatalog()
     mergePiAi(rows, pi)
     annotateComparisons(rows)
-    stats.promotions = attachPromos(rows, promos)
+    const promoResult = attachPromos(rows, promos)
+    stats.promotions = promoResult.matched
     builtKey = JSON.stringify({ sourceUrl: settings.sourceUrl, tagRules: settings.tagRules ?? null, promoFeedUrl: settings.promoFeedUrl })
     const payload = {
       generatedAt: new Date().toISOString(),
       ttlSeconds: Math.round(settings.ttlMs / 1000),
       source: { name: 'models.dev', url: settings.sourceUrl },
-      promotions: { source: settings.promoFeedUrl || null, count: stats.promotions },
+      promotions: { source: settings.promoFeedUrl || null, count: stats.promotions, providerOffers: promoResult.providerOffers },
       stats,
       providers: { configured: configuredProviders() },
       rows,

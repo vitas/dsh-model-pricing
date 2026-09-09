@@ -19,6 +19,24 @@ export interface RowSource {
   piPrice?: { input?: number; output?: number; cacheRead?: number; cacheWrite?: number }
 }
 
+export interface ProviderOffer {
+  model?: string
+  promo: string
+  discountPct?: number
+  fixedCost?: { input?: number; output?: number; cacheRead?: number; cacheWrite?: number }
+  until: string
+  url?: string
+  verifiedAt: string
+  by: string
+}
+
+export interface ProviderOffers {
+  count: number
+  /** Earliest expiry among the provider's active offers. */
+  until?: string
+  offers: ProviderOffer[]
+}
+
 export interface PricingRow {
   provider: string
   providerName: string
@@ -66,7 +84,13 @@ export interface PricingPayload {
   stats: { providers: number; models: number; priced: number; promotions?: number }
   providers: { configured: string[] }
   /** Promotion feed provenance (the compiled feed URL, or null when disabled). */
-  promotions?: { source: string | null; count: number }
+  promotions?: {
+    source: string | null
+    /** Catalog rows that carry an attached row-level promotion. */
+    count: number
+    /** Active offers per normalized provider id (whole-provider and model-scoped). */
+    providerOffers?: Record<string, ProviderOffers>
+  }
   rows: PricingRow[]
   fromCache?: boolean
   /** Embedded fallbacks ship a curated subset; flagged so the UI can say so. */

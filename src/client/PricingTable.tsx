@@ -262,6 +262,13 @@ export function PricingTable({ store }: { store: Store }) {
  * models.dev provider id. Prices stay list prices — the badge says where the
  * provider stands in the catalog, nothing more.
  */
+/** Multi-line tooltip: one row per active offer, plus provenance. */
+function offersTitle(offers: { offers: { model?: string; promo: string; until: string; verifiedAt: string; by: string }[] }): string {
+  return offers.offers
+    .map((o) => `${o.model ? o.model + ': ' : ''}${o.promo} · ${tr('promoUntil', { until: o.until })} · ${o.verifiedAt} ${o.by}`)
+    .join('\n')
+}
+
 export function makeProviderBadge(store: Store) {
   return function ProviderBadge(props: { provider?: { provider?: string; settingsNs?: string }; store?: unknown }) {
     const state = useSyncExternalStore(store.subscribe, store.getState)
@@ -270,12 +277,20 @@ export function makeProviderBadge(store: Store) {
     }, [])
     if (!state.payload) return null
     const entry = props.provider ?? {}
-    const candidates = [entry.settingsNs?.replace(/^llm-/, ''), entry.provider]
+    const candidates = [entry.settingsNs?.replace(/^llm-/, ''), entry.provider].filter((x): x is string => !!x)
     let summary: ReturnType<Store['providerSummary']> | undefined
+    let offers: ReturnType<Store['providerOffers']> | undefined
     for (const id of candidates) {
-      if (!id) continue
-      summary = store.providerSummary(id)
-      if (summary) break
+      summary ??= store.providerSummary(id)
+      offers ??= store.providerOffers(id)
+    }
+    // Whole-provider promotions render even for gateways without catalog rows.
+    if (!summary && offers) {
+      return (
+        <span title={offersTitle(offers)} style={{ ...s.badge, color: 'var(--dsw-alias-brand-primary)', fontWeight: 600 }}>
+          {tr('promoCount', { n: offers.count })}
+        </span>
+      )
     }
     if (!summary || !Number.isFinite(summary.minOutput as number)) return null
     return (
@@ -284,7 +299,7 @@ export function makeProviderBadge(store: Store) {
         style={{ ...s.badge, color: 'var(--dsw-alias-label-secondary)' }}
       >
         {tr('providerBadge', { price: money(summary.minOutput), models: summary.models })}
-        {summary.offers ? tr('providerBadgeOffers', { n: summary.offers }) : ''}
+        {(offers?.count ?? summary.offers) ? tr('providerBadgeOffers', { n: offers?.count ?? summary.offers }) : ''}
       </span>
     )
   }

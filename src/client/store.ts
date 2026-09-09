@@ -145,6 +145,17 @@ export function createStore(fallback: PricingPayload | null) {
   }
 
   /**
+   * Active community offers for a provider, keyed by the normalized id
+   * (lowercase alphanumeric). Covers providers absent from the pricing catalog
+   * (a gateway with its own promotions) — the provider card is their only seat.
+   */
+  function providerOffers(providerId: string): import('./types.js').ProviderOffers | undefined {
+    const map = state.payload?.promotions?.providerOffers
+    if (!map) return undefined
+    return map[providerId.toLowerCase().replace(/[^a-z0-9]/g, '')]
+  }
+
+  /**
    * Rollup of catalog rows for one provider id (case-insensitive). Used by the
    * provider-card badges (C1) on the Models page; `undefined` when the provider
    * is not in the loaded catalog. Memoized per payload reference.
@@ -192,6 +203,7 @@ export function createStore(fallback: PricingPayload | null) {
     getState: () => state,
     visibleRows,
     providerSummary,
+    providerOffers,
     allTags,
     setFilters,
     setCollapsed(collapsed: boolean) {

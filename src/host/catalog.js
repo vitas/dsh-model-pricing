@@ -187,18 +187,30 @@ export async function fetchPromoFeed(url) {
  * @returns number of rows that received a promo.
  */
 export function attachPromos(rows, promos) {
-  if (!Array.isArray(promos) || promos.length === 0) return 0
+  const empty = { matched: 0, providerOffers: {} }
+  if (!Array.isArray(promos) || promos.length === 0) return empty
   const now = Date.now()
+  const active = promos.filter((p) => !(typeof p?.until === 'string' && Date.parse(p.until) <= now))
+  // Row-level records (with `model`): attach the earliest-expiring offer per route.
   /** @type {Map<string, object[]>} */
   const byModel = new Map()
-  for (const p of promos) {
-    if (typeof p?.until === 'string' && Date.parse(p.until) <= now) continue // hide expired
-    const key = `${String(p.provider ?? '').toLowerCase()}|${String(p.model ?? '').toLowerCase()}`
-    const list = byModel.get(key)
+  // Provider-level rollup: every active offer of a provider, keyed by normalized
+  // id, including model-scoped ones — a provider card may be rendered for a
+  // gateway that has no rows in the pricing catalog at all.
+  /** @type {Map<string, object[]>} */
+  const byProviderKey = new Map()
+  for (const p of active) {
+    const prov = String(p.provider ?? '')
+    if (!prov) continue
+    const list = byProviderKey.get(normalizeProviderId(prov))
     if (list) list.push(p)
+    else byProviderKey.set(normalizeProviderId(prov), [p])
+    if (!p.model) continue
+    const key = `${prov.toLowerCase()}|${String(p.model).toLowerCase()}`
+    const lm = byModel.get(key)
+    if (lm) lm.push(p)
     else byModel.set(key, [p])
   }
-  if (byModel.size === 0) return 0
   let matched = 0
   for (const row of rows) {
     const list = byModel.get(`${row.provider.toLowerCase()}|${row.modelId.toLowerCase()}`)
@@ -208,5 +220,28 @@ export function attachPromos(rows, promos) {
     if (list.length > 1) row.promo.more = list.length - 1
     matched++
   }
-  return matched
+  const providerOffers = {}
+  for (const [key, list] of byProviderKey) {
+    const sorted = [...list].sort((a, b) => Date.parse(a.until) - Date.parse(b.until))
+    providerOffers[key] = {
+      count: sorted.length,
+      until: sorted[0]?.until,
+      offers: sorted.map((p) => ({
+        model: p.model,
+        promo: p.promo,
+        discountPct: p.discountPct,
+        fixedCost: p.fixedCost,
+        until: p.until,
+        url: p.url,
+        verifiedAt: p.verifiedAt,
+        by: p.by,
+      })),
+    }
+  }
+  return { matched, providerOffers }
+}
+
+/** Lowercase alphanumeric-only form of a provider id, for cross-source matching. */
+export function normalizeProviderId(id) {
+  return String(id).toLowerCase().replace(/[^a-z0-9]/g, '')
 }

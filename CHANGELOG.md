@@ -21,6 +21,11 @@ semantic versioning.
 - **Promotion badges** on the pricing table: accent badge with provenance
   tooltip (offer text, expiry, verified-by, link), a "Promotions" filter chip,
   and an active-offers count in the status line.
+- **Whole-provider offers**: feed records without a `model` describe a provider
+  as a whole and surface on that provider's card in the Models settings page —
+  including gateways that are not in the pricing catalog at all. The feed is
+  seeded with B.AI's eight documented promotions (API free tiers and discounts,
+  verified against the official pricing-notices page).
 - **Provider-card badges** on the Models page: each configured provider's card
   shows its lowest per-1M output price, priced-model count and active-offer
   count, straight from the catalog.

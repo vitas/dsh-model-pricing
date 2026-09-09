@@ -9,12 +9,19 @@
  *
  * Rules enforced here:
  *  - JSON object array, no unknown top-level keys;
- *  - required: model, promo, until (ISO date), verifiedAt (ISO date), by;
+ *  - required: promo, until (ISO date), verifiedAt (ISO date), by;
+ *  - optional `model`: with it the record targets one catalog route
+ *    (provider+model); without it the record is a whole-provider offer, surfaced
+ *    on the provider's card in the Models settings page even when that provider
+ *    is absent from the pricing catalog (e.g. a gateway with its own promotions);
  *  - exactly one of discountPct (1..90) or fixedCost (per-1M USD object with
  *    input/output, numbers >= 0); discountPct is capped at 90% because deeper
- *    claims are almost always misread "free";
+ *    claims are almost always misread "free"; a genuinely free offer uses
+ *    fixedCost {input:0,output:0};
  *  - until must be in the future at validation time (expired rows are dropped by
- *    the compiler anyway, but a PR must not add stale data);
+ *    the compiler anyway, but a PR must not add stale data). When a promotion has
+ *    no published end date, contributors set `until` to their own next-verify
+ *    date so stale offers stop being advertised;
  *  - no duplicate (provider, model, promo) keys across files.
  *
  * Exits 0 when every file is valid; prints one line per problem otherwise.
@@ -46,8 +53,12 @@ function checkFile(file) {
     const at = `${file}[${i}]`
     if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) return problems.push(`${at}: must be an object`)
     for (const key of Object.keys(entry)) if (!ALLOWED.has(key)) problems.push(`${at}: unknown key "${key}"`)
-    for (const key of ['model', 'promo', 'until', 'verifiedAt', 'by']) {
+    for (const key of ['promo', 'until', 'verifiedAt', 'by']) {
       if (typeof entry[key] !== 'string' || !entry[key].trim()) problems.push(`${at}: "${key}" is required (string)`)
+    }
+    // model is optional: present => a single catalog route; absent => whole provider.
+    if (entry.model !== undefined && (typeof entry.model !== 'string' || !entry.model.trim())) {
+      problems.push(`${at}: "model" must be a non-empty string when present`)
     }
     if (entry.url !== undefined && !/^https?:\/\/.+/.test(String(entry.url))) problems.push(`${at}: url must be http(s)`)
     if (!isDate(entry.until)) problems.push(`${at}: until must be YYYY-MM-DD`)
@@ -71,7 +82,7 @@ function checkFile(file) {
         for (const field of Object.keys(fc)) if (!['input', 'output', 'cacheRead', 'cacheWrite'].includes(field)) problems.push(`${at}: fixedCost.${field} is not a known price field`)
       }
     }
-    const dupKey = `${provider.toLowerCase()}|${String(entry.model).toLowerCase()}|${String(entry.promo).toLowerCase()}`
+    const dupKey = `${provider.toLowerCase()}|${(entry.model ?? '').toLowerCase()}|${String(entry.promo).toLowerCase()}`
     if (seen.has(dupKey)) problems.push(`${at}: duplicate (provider, model, promo) already contributed in another file`)
     seen.add(dupKey)
   })

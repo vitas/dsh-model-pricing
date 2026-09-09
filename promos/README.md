@@ -28,3 +28,19 @@ Rules (enforced by CI, see `scripts/validate-promos.mjs`):
 Files starting with `_` are examples and are never compiled into the feed.
 On merge, CI regenerates the published feed; expired records are dropped by the
 compiler and hidden by the plugin at render time regardless.
+
+## Records without `model`
+
+A record may omit `model`. It then describes a **whole-provider** offer and is
+shown on the provider's card in the Models settings page — including for
+gateways that have no rows in the pricing catalog at all (the feed, not the
+catalog, defines the provider's offers).
+
+## Promotions without a published end date
+
+Providers often say "limited-time" without announcing when it ends. The schema
+requires `until` regardless. Set it to the date **you will re-verify by** (a
+review horizon, e.g. 30 days out), and say so in the `promo` text ("end not
+announced"). An expired record disappears from the UI automatically; it can be
+re-verified and re-submitted with a fresh date, so the feed can only advertise
+promotions that someone vouched for recently.
