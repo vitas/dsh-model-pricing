@@ -134,9 +134,11 @@ function Row({ row, expanded, onToggle, configured }: { row: PricingRow; expande
             </a>
           )}
         </td>
-        <td style={s.td('right')}>{money(row.cost.input)}</td>
-        <td style={s.td('right')}>{money(row.cost.output)}</td>
-        <td style={s.td('right')}>{money(row.cost.cacheRead)}</td>
+        <td style={s.td('right')} title={row.flatPlan ? tr('subTip') : undefined}>
+          {row.flatPlan ? <span style={{ color: 'var(--dsw-alias-label-tertiary)' }}>{tr('subCell')}</span> : money(row.cost.input)}
+        </td>
+        <td style={s.td('right')}>{row.flatPlan ? '' : money(row.cost.output)}</td>
+        <td style={s.td('right')}>{row.flatPlan ? '' : money(row.cost.cacheRead)}</td>
         <td style={s.td('right')}>{context(row.context)}</td>
         <td style={s.td('left')}>
           {row.tags.slice(0, 3).map((t) => <span key={t} style={s.badge}>{TAG_LABELS[t] ?? t}</span>)}
@@ -182,7 +184,7 @@ export function PricingTable({ store }: { store: Store }) {
 
   const groups = new Map<string, PricingRow[]>()
   for (const row of rows) {
-    const g = filters.grouping === 'flat' ? '—' : row.providerName
+    const g = filters.grouping === 'flat' ? '—' : row.flatPlan ? tr('plansGroup') : row.providerName
     ;(groups.get(g) ?? groups.set(g, []).get(g)!).push(row)
   }
 

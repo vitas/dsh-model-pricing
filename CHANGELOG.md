@@ -21,6 +21,13 @@ semantic versioning.
 - **Promotion badges** on the pricing table: accent badge with provenance
   tooltip (offer text, expiry, verified-by, link), a "Promotions" filter chip,
   and an active-offers count in the status line.
+- **Provider-card badges** on the Models page: each configured provider's card
+  shows its lowest per-1M output price, priced-model count and active-offer
+  count, straight from the catalog.
+- **Subscription-plan grouping**: coding/token plan providers are collected
+  into one group, their nominal $0 per-token prices render as "sub.", and plan
+  routes are excluded from cross-provider comparison (they previously won
+  "cheapest" for 39 models on a $0 price that is not a per-token rate).
 - **Russian language pack**: the harness ships English and Chinese; this plugin
   additionally registers Russian, selected automatically for Russian browsers.
 - **Disk cache** under the DSH home: an offline cold start serves the last real

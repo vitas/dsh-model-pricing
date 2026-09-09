@@ -157,6 +157,10 @@ Releases: v0.1 = Epics A + E; v0.2 = Epic B (automatic part) + Epic C; v0.3 = Ep
   via settings (A3).
 - **Q4 (closed) — blended price metric:** deferred to P1 together with B1; v0.1 sorts
   by output price (A6).
+- **Q8 (closed) — subscription plans:** models.dev lists coding/token plan providers at
+  a nominal $0 per-token price. Rows from providers whose name matches `coding|token
+  plan` are flagged `flatPlan`: grouped together, rendered as "sub." rather than $0,
+  and excluded from price comparison. This is data-sourced, not guessed.
 - **Q5 (open):** whether the chat stats strip offers a supported extension point for
   the session-cost display (D2); to be checked in M3.
 - **Q6 (closed with follow-up):** attribution is shown per row (source + date) and in
@@ -179,7 +183,7 @@ commit history and the release notes.
 |------|--------|
 | Epic A — pricing table | Done in v0.1.0 (A1–A7 incl. cross-provider comparison A2; tag-rule configuration A3 via settings) |
 | A8 — plugin settings | Done: `model-pricing` namespace (refresh interval, catalog source, tag rules) registered through `settings.installSection`, editable live via settings.yaml and via the Plugins-tab card (E4). Promotion-feed URL arrives with B3 |
-| Epic B — comparisons & promotions | B3 promotion feed done (schema, CI validation + compiled feed on the `feed` branch, host attach, badge + filter chip). B1/B2 remain: they need verified flat-rate plan data to avoid guessing; the community promo flow already covers per-plan offers |
+| Epic B — comparisons & promotions | B3 promotion feed done (schema, CI validation + compiled feed on the `feed` branch, host attach, badge + filter chip). B2 done: subscription-plan providers (models.dev names matching `coding|token plan`) are flagged `flatPlan`, collected into one 'Coding & token plans' group, shown with a 'sub.' cell instead of nominal $0, and excluded from cross-provider comparison so a subscription price can never win 'cheapest' (39 routes were being mislabeled before this fix) |
 | Epic C — provider-card badges | Deferred to M3: the keyed `settings.models.provider-card` seam is an internal contract; registering it from an out-of-tree plugin would depend on undocumented key semantics (same category as Q5) |
 | Epic D — session cost | Deferred (M3) |
 | Epic E — engineering | E1–E4 done (E4 as of the M1 completion work; card shipped with the settings namespace) |

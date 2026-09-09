@@ -8,6 +8,9 @@ import { computeTags, resolveTagRules } from '../shared/tags.mjs'
 
 export const DEFAULT_SOURCE_URL = 'https://models.dev/api.json'
 
+/** Matches subscription-plan providers as named by models.dev (B2). */
+export const FLAT_PLAN_RE = /(?:coding|token) plan/i
+
 const finite = (value) => (typeof value === 'number' && Number.isFinite(value) ? value : undefined)
 
 /** Normalize one catalog model into a PricingRow, or return null when unusable. */
@@ -49,6 +52,10 @@ function toRow(model, provider, rules) {
     sources: [{ origin: 'models.dev', updated: typeof model.last_updated === 'string' ? model.last_updated : undefined }],
     status: model.status === 'beta' || model.status === 'deprecated' ? model.status : undefined,
     experimental: model.experimental === true || undefined,
+    // Subscription plans (coding/token plan bundles) publish $0 per-token prices
+    // that are not usable per-token prices; flagged so the UI can group them
+    // and the comparison ignores them.
+    flatPlan: FLAT_PLAN_RE.test(String(provider.name || provider.id || '')) || undefined,
   }
   row.tags = computeTags(row, row.description, rules)
   return row
@@ -101,6 +108,7 @@ export function annotateComparisons(rows) {
   }
   const groups = new Map()
   for (const row of rows) {
+    if (row.flatPlan) continue // $0 subscription prices are not comparable per-token routes
     const key = canonical(row.modelId)
     if (key.length < 5) continue
     if (!groups.has(key)) groups.set(key, [])

@@ -44,6 +44,8 @@ export interface PricingRow {
   authoritative?: string
   /** Cross-provider comparison for the same model (A2); present in multi-provider groups. */
   compare?: { providers: number; cheapest: boolean; pctOver?: number; cheapestProvider?: string }
+  /** Subscription plan (coding/token plan): the $0 per-token prices are nominal. */
+  flatPlan?: boolean
   /** Active community-contribution promotion for this route; absent when none. */
   promo?: {
     promo: string

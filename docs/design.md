@@ -154,7 +154,13 @@ localization decision). Reference copy:
 | fromRange | from {input} / {output} per 1M |
 | emptyFilter | No models match the current filters. |
 | stale | stale |
-| promo.until | until {date} |
+| promoChip | Promotions |
+| promoCount | {n} active offer(s) |
+| promoTip | Promotion: {text} · until {until} · verified {verifiedAt} by {by} |
+| plansGroup | Coding & token plans (subscription) |
+| subCell | sub. |
+| subTip | Flat-rate subscription plan — the listed per-token prices are nominal, not usable rates |
+| providerBadge | catalog: from {price} /1M out · {models} models |
 
 ## 9. Accessibility
 
