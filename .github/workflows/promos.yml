@@ -1,7 +1,7 @@
 name: promos
 # Validates `promos/**` on pull requests and publishes the compiled feed to the
-# orphan `gh-pages` branch on merge (docs/architecture.md §4.3). The plugin
-# fetches only https://raw.githubusercontent.com/<owner>/<repo>/gh-pages/promo-dist/index.json
+# orphan `feed` branch on merge (docs/architecture.md §4.3). The plugin
+# fetches only https://raw.githubusercontent.com/<owner>/<repo>/feed/promo-dist/index.json
 on:
   pull_request:
     paths:
@@ -39,7 +39,7 @@ jobs:
           node-version: 20
       - name: Compile the active feed
         run: node scripts/compile-promos.mjs
-      - name: Publish promo-dist to the gh-pages branch
+      - name: Publish promo-dist to the feed branch
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -47,9 +47,16 @@ jobs:
           mkdir -p .ci-publish/promo-dist
           cp promo-dist/index.json .ci-publish/promo-dist/
           cd .ci-publish
-          git init -q -b gh-pages
+          git init -q -b feed
           git config user.name "promo-bot"
           git config user.email "promo-bot@users.noreply.github.com"
           git add -f promo-dist/index.json
           git commit -qm "promo feed $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          git push -f "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" gh-pages:gh-pages
+          # GitHub occasionally rejects a fresh feed ref with a transient
+          # "fatal error in commit_refs"; retry a few times with backoff.
+          url="https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          for attempt in 1 2 3 4 5; do
+            if git push -f "$url" feed:feed; then exit 0; fi
+            echo "push attempt $attempt failed; retrying"; sleep "$((attempt * 5))"
+          done
+          echo "push failed after retries" >&2; exit 1

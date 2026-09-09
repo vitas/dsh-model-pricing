@@ -145,7 +145,7 @@ export async function fetchModelsDev(url = DEFAULT_SOURCE_URL) {
 
 /** Default compiled promotion feed (this repository's published artifact). */
 export const DEFAULT_PROMO_URL =
-  'https://raw.githubusercontent.com/vitas/dsh-model-pricing/gh-pages/promo-dist/index.json'
+  'https://raw.githubusercontent.com/vitas/dsh-model-pricing/feed/promo-dist/index.json'
 
 /**
  * Fetch the compiled promotion feed. Non-fatal by contract: any failure returns

@@ -149,9 +149,11 @@ Source files in this repository, `promos/<provider>.json`:
 
 Contribution flow: a user opens a pull request changing `promos/**`. CI validates
 schema, required fields, future `until`, and duplicate (provider, model, promo) keys.
-On merge to `main`, CI compiles the active entries into `promo-dist/index.json`, which
-is what the plugin fetches (default URL points at this repository; configurable in
-settings). Independently, the plugin hides any record whose `until` has passed, so a
+On merge to `main`, CI compiles the active entries into `promo-dist/index.json` and
+publishes it to the orphan `feed` branch, which is what the plugin fetches (default
+URL `https://raw.githubusercontent.com/vitas/dsh-model-pricing/feed/promo-dist/index.json`,
+configurable in settings). A dedicated non-`gh-pages` branch avoids coupling to GitHub
+Pages while still serving over `raw.githubusercontent.com`. Independently, the plugin hides any record whose `until` has passed, so a
 missed CI run cannot display an expired offer.
 
 ### 4.4 Tag rules (A3, configurable)
