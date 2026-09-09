@@ -8,6 +8,8 @@ import type { PricingPayload, PricingRow } from './types.js'
 
 export type LoadStatus = 'idle' | 'loading' | 'live' | 'cached' | 'embedded' | 'absent' | 'error'
 
+export interface ProviderSummary { minOutput?: number; models: number; offers: number }
+
 export interface Filters {
   query: string
   tags: string[]
@@ -142,6 +144,39 @@ export function createStore(fallback: PricingPayload | null) {
     return rows
   }
 
+  /**
+   * Rollup of catalog rows for one provider id (case-insensitive). Used by the
+   * provider-card badges (C1) on the Models page; `undefined` when the provider
+   * is not in the loaded catalog. Memoized per payload reference.
+   */
+  let summaryCache: { payload: unknown; map: Map<string, ProviderSummary> } | null = null
+  function providerSummary(providerId: string): ProviderSummary | undefined {
+    const { payload } = state
+    if (!payload) return undefined
+    if (!summaryCache || summaryCache.payload !== payload) {
+      summaryCache = { payload, map: new Map() }
+      for (const row of payload.rows) {
+        const key = row.provider.toLowerCase()
+        const cur = summaryCache.map.get(key)
+        const output = row.cost.output
+        if (!cur) {
+          summaryCache.map.set(key, {
+            minOutput: Number.isFinite(output as number) ? (output as number) : undefined,
+            models: 1,
+            offers: row.promo ? 1 : 0,
+          })
+        } else {
+          cur.models++
+          if (row.promo) cur.offers++
+          if (Number.isFinite(output as number) && (cur.minOutput === undefined || (output as number) < cur.minOutput)) {
+            cur.minOutput = output as number
+          }
+        }
+      }
+    }
+    return summaryCache.map.get(providerId.toLowerCase())
+  }
+
   /** All tags present in the loaded payload, ordered by chip label. */
   function allTags(): string[] {
     const tags = new Set<string>()
@@ -156,6 +191,7 @@ export function createStore(fallback: PricingPayload | null) {
     },
     getState: () => state,
     visibleRows,
+    providerSummary,
     allTags,
     setFilters,
     setCollapsed(collapsed: boolean) {

@@ -252,3 +252,38 @@ export function PricingTable({ store }: { store: Store }) {
     </div>
   )
 }
+
+/**
+ * C1: badge for DSH provider cards on the Models page (keyed slot
+ * settings.models.provider-card). Renders only when the DSH provider id maps to
+ * a catalog provider with priced models; maps `llm-<id>` namespaces to the
+ * models.dev provider id. Prices stay list prices — the badge says where the
+ * provider stands in the catalog, nothing more.
+ */
+export function makeProviderBadge(store: Store) {
+  return function ProviderBadge(props: { provider?: { provider?: string; settingsNs?: string }; store?: unknown }) {
+    const state = useSyncExternalStore(store.subscribe, store.getState)
+    React.useEffect(() => {
+      void store.load()
+    }, [])
+    if (!state.payload) return null
+    const entry = props.provider ?? {}
+    const candidates = [entry.settingsNs?.replace(/^llm-/, ''), entry.provider]
+    let summary: ReturnType<Store['providerSummary']> | undefined
+    for (const id of candidates) {
+      if (!id) continue
+      summary = store.providerSummary(id)
+      if (summary) break
+    }
+    if (!summary || !Number.isFinite(summary.minOutput as number)) return null
+    return (
+      <span
+        title={`${tr('estimates')} · ${tr('perMillion')}`}
+        style={{ ...s.badge, color: 'var(--dsw-alias-label-secondary)' }}
+      >
+        {tr('providerBadge', { price: money(summary.minOutput), models: summary.models })}
+        {summary.offers ? tr('providerBadgeOffers', { n: summary.offers }) : ''}
+      </span>
+    )
+  }
+}

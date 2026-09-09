@@ -14,7 +14,7 @@
  */
 import * as React from 'react'
 import { createStore } from './store.js'
-import { PricingTable, PricingHeader } from './PricingTable.js'
+import { PricingTable, PricingHeader, makeProviderBadge } from './PricingTable.js'
 import { PricingSettingsCard } from './SettingsCard.js'
 import { bindTranslator } from './i18n.js'
 import { en, zh, ru } from './locales.js'
@@ -93,6 +93,26 @@ export function apply(ctx: any) {
         c.slots.register({ name: 'settings.plugin.item', key: NS, id: 'model-pricing', order: 10 }, () => (
           React.createElement(PricingSettingsCard, { scope })
         )))
+      // C1: provider-card badges on the Models page. LLM adapters own settings
+      // namespaces named `llm-<provider>`; entries are registered for each served
+      // namespace and the page dispatches only those that back a visible provider
+      // row, passing the provider entry as props.
+      const face = c.settingsScope.describe()
+      const registered = new Set<string>()
+      const badge = makeProviderBadge(store)
+      const syncCards = () => {
+        const view = face.getSnapshot().view
+        if (!view) return
+        for (const d of view.namespaces ?? []) {
+          const ns = typeof d?.ns === 'string' ? d.ns : ''
+          if (!ns.startsWith('llm-') || registered.has(ns)) continue
+          registered.add(ns)
+          c.slots.inject('settings.models.provider-card', () =>
+            c.slots.register({ name: 'settings.models.provider-card', key: ns, id: `model-pricing/${ns}`, order: 50 }, badge))
+        }
+      }
+      c.effect(face.subscribe(syncCards))
+      void Promise.resolve(face.ensure?.()).then(syncCards).catch(() => {})
     } catch {
       // binding anomalies must never break the settings page itself
     }
