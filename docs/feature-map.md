@@ -169,3 +169,19 @@ Releases: v0.1 = Epics A + E; v0.2 = Epic B (automatic part) + Epic C; v0.3 = Ep
   Russian as a selectable language pack via `ctx.locale.addLanguage({ id: 'ru' })`,
   with per-key fallback to English. Users of the Russian browser get Russian
   without any patching of the harness.
+
+## 8. Implementation status
+
+Updated as milestones land; the source of truth for per-item detail is the
+commit history and the release notes.
+
+| Item | Status |
+|------|--------|
+| Epic A — pricing table | Done in v0.1.0 (A1–A7 incl. cross-provider comparison A2; tag-rule configuration A3 via settings) |
+| A8 — plugin settings | Done: `model-pricing` namespace (refresh interval, catalog source, tag rules) registered through `settings.installSection`, editable live via settings.yaml and via the Plugins-tab card (E4). Promotion-feed URL arrives with B3 |
+| Epic B — comparisons & promotions | Open (M2): B3 promotion feed, B2 coding-plan grouping |
+| Epic C — provider-card badges | Open (M2) |
+| Epic D — session cost | Deferred (M3) |
+| Epic E — engineering | E1–E4 done (E4 as of the M1 completion work; card shipped with the settings namespace) |
+| v0.1.0 | Published to npm (2026-09-09); tagged on GitHub |
+

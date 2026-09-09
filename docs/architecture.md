@@ -254,8 +254,8 @@ Spike findings that shape this workflow (`spike/RESULTS.md`):
 
 | Milestone | Adds |
 |-----------|------|
-| **M1 = v0.1 (Epics A + E)** | everything described above |
-| **M2 (B1 + C)** | family grouping in the merged snapshot, blended price (A6) on rows, promotion column, provider-card badges |
+| **M1 = v0.1 (Epics A + E)** — done, released 2026-09-09 | everything described above |
+| **M2 (B1 + C)** — in progress | family grouping in the merged snapshot, blended price (A6) on rows, promotion column, provider-card badges |
 | **M3 (B3 UI polish + D)** | `/pricing` popup (reuses the same store), session-cost estimate: token measurement lives on the Host, so the first version either posts the measured totals to a small host route or moves to a typed Remote if DSH publishes out-of-tree code generation by then |
 
 ## 10. Architectural risks
