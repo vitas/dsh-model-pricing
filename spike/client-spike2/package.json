@@ -1,0 +1,9 @@
+{
+  "name": "dsh-model-pricing-spike2",
+  "version": "0.0.1",
+  "type": "module",
+  "main": "./src/host.js",
+  "exports": { ".": "./src/host.js", "./client": "./src/client.js" },
+  "files": ["src"],
+  "dsh": { "client": { "platform": "web", "inject": ["@deepseek-ai/dsh-client-ui-settings-models"] } }
+}
