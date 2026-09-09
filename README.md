@@ -29,7 +29,7 @@ capability metadata), merged host-side with TTL caching and offline fallback.
 |-----|---------|
 | [docs/feature-map.md](docs/feature-map.md) | Feature spec & map (RU): epics, IDs, DoD, risks, open questions |
 | [docs/architecture.md](docs/architecture.md) | Transport, package layout, data model, CI, spikes (RU) |
-| docs/design.md | next: UX of the pricing section |
+| [docs/design.md](docs/design.md) | UX of the pricing section: layout, states, badges, tokens, a11y (RU) |
 
 ## Install (will be)
 
