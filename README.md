@@ -34,9 +34,11 @@ your own machine.
   own bundled `pi-ai` catalog overrides the public catalog, and price divergences
   larger than 10% are flagged row by row
 - **Automatic cross-provider comparison** for the same model (`−N% vs …`, `cheapest`)
-- **Promotion feed** with expiry tracking, contributed as reviewed pull requests
-- **Badges inside provider cards** on the Models settings page
-- **`/pricing` command** and approximate per-session cost (planned)
+- **Community promotion feed**: verified, time-boxed offers rendered as badges with
+  provenance tooltips and a one-click filter; contributed through reviewed pull
+  requests and validated by CI (`promos/README.md`)
+- Planned next: badges inside provider cards, a `/pricing` command, and
+  approximate per-session cost
 
 ## Install
 
