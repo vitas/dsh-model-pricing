@@ -14,7 +14,15 @@ import { gzipSync } from 'node:zlib'
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { DEFAULT_SOURCE_URL, annotateComparisons, fetchModelsDev, pruneModelsDev } from './catalog.js'
+import {
+  DEFAULT_PROMO_URL,
+  DEFAULT_SOURCE_URL,
+  annotateComparisons,
+  attachPromos,
+  fetchModelsDev,
+  fetchPromoFeed,
+  pruneModelsDev,
+} from './catalog.js'
 
 
 const PLUGIN_ID = 'dsh-model-pricing'
@@ -120,6 +128,8 @@ function normalizeSettings(raw = {}) {
     sourceUrl: typeof raw.sourceUrl === 'string' && raw.sourceUrl ? raw.sourceUrl : DEFAULT_SOURCE_URL,
     ttlMs: Number.isFinite(raw.ttlMinutes) && raw.ttlMinutes > 0 ? raw.ttlMinutes * 60_000 : DEFAULT_TTL_MS,
     tagRules: raw.tagRules,
+    promoFeedUrl:
+      typeof raw.promoFeedUrl === 'string' ? raw.promoFeedUrl : DEFAULT_PROMO_URL,
   }
 }
 
@@ -133,7 +143,7 @@ export async function apply(ctx, config = {}) {
   /** Effective configuration: composition entry until the settings service attaches. */
   let settings = normalizeSettings(config)
   /** Key of the config the current snapshot was built from (catalog-affecting fields). */
-  let builtKey = JSON.stringify({ sourceUrl: settings.sourceUrl, tagRules: settings.tagRules ?? null })
+  let builtKey = JSON.stringify({ sourceUrl: settings.sourceUrl, tagRules: settings.tagRules ?? null, promoFeedUrl: settings.promoFeedUrl })
 
   /**
    * Live configuration via DSH's settings service (E3). The namespace mirrors the
@@ -150,6 +160,7 @@ export async function apply(ctx, config = {}) {
     const { default: z } = await import('@deepseek-ai/schemastery')
     const schema = z.object({
       sourceUrl: z.string().default(DEFAULT_SOURCE_URL),
+      promoFeedUrl: z.string().default(DEFAULT_PROMO_URL),
       ttlMinutes: z.number().default(Math.round(DEFAULT_TTL_MS / 60_000)),
       tagRules: z.any(),
     })
@@ -162,7 +173,7 @@ export async function apply(ctx, config = {}) {
         onChange: () => {
           const next = normalizeSettings(source())
           settings = next
-          const nextKey = JSON.stringify({ sourceUrl: next.sourceUrl, tagRules: next.tagRules ?? null })
+          const nextKey = JSON.stringify({ sourceUrl: next.sourceUrl, tagRules: next.tagRules ?? null, promoFeedUrl: next.promoFeedUrl })
           if (nextKey !== builtKey) snapshot = null // forces a rebuild on the next request
         },
       })
@@ -172,16 +183,23 @@ export async function apply(ctx, config = {}) {
   }
 
   async function build() {
-    const doc = await fetchModelsDev(settings.sourceUrl)
+    // The catalog is required; the promotion feed is best-effort (fetchPromoFeed
+    // never throws). They are independent, so they load concurrently.
+    const [doc, promos] = await Promise.all([
+      fetchModelsDev(settings.sourceUrl),
+      fetchPromoFeed(settings.promoFeedUrl),
+    ])
     const { rows, stats } = pruneModelsDev(doc, settings.tagRules)
     const pi = await loadPiAiCatalog()
     mergePiAi(rows, pi)
     annotateComparisons(rows)
-    builtKey = JSON.stringify({ sourceUrl: settings.sourceUrl, tagRules: settings.tagRules ?? null })
+    stats.promotions = attachPromos(rows, promos)
+    builtKey = JSON.stringify({ sourceUrl: settings.sourceUrl, tagRules: settings.tagRules ?? null, promoFeedUrl: settings.promoFeedUrl })
     const payload = {
       generatedAt: new Date().toISOString(),
       ttlSeconds: Math.round(settings.ttlMs / 1000),
       source: { name: 'models.dev', url: settings.sourceUrl },
+      promotions: { source: settings.promoFeedUrl || null, count: stats.promotions },
       stats,
       providers: { configured: configuredProviders() },
       rows,

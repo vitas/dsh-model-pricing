@@ -142,3 +142,63 @@ export async function fetchModelsDev(url = DEFAULT_SOURCE_URL) {
   if (!response.ok) throw new Error(`models.dev responded ${String(response.status)}`)
   return await response.json()
 }
+
+/** Default compiled promotion feed (this repository's published artifact). */
+export const DEFAULT_PROMO_URL =
+  'https://raw.githubusercontent.com/vitas/dsh-model-pricing/gh-pages/promo-dist/index.json'
+
+/**
+ * Fetch the compiled promotion feed. Non-fatal by contract: any failure returns
+ * an empty list so a promo outage can never hide the price table.
+ * @param url - feed location; empty/undefined disables promotions.
+ * @returns records shaped `{ provider, model, promo, discountPct?, fixedCost?, until, url?, verifiedAt, by }`.
+ */
+export async function fetchPromoFeed(url) {
+  if (!url || typeof url !== 'string') return []
+  try {
+    const response = await fetch(url, {
+      headers: { accept: 'application/json', 'user-agent': 'dsh-model-pricing/0.1 (local plugin)' },
+      signal: AbortSignal.timeout(15_000),
+    })
+    if (!response.ok) return []
+    const doc = await response.json()
+    return Array.isArray(doc?.promos) ? doc.promos : []
+  } catch {
+    return [] // promotions are an enhancement; never break the catalog for them
+  }
+}
+
+/**
+ * Attach active promotions to rows (B3). Matching is case-insensitive on
+ * `provider/model`; a record whose `until` has passed is ignored even if the
+ * feed still carries it, so a missed CI run cannot display a stale offer. A row
+ * takes the earliest-expiring active promotion; additional records are kept
+ * only as a count.
+ * @param rows - catalog rows (mutated: a `promo` field is set on matches).
+ * @param promos - feed records.
+ * @returns number of rows that received a promo.
+ */
+export function attachPromos(rows, promos) {
+  if (!Array.isArray(promos) || promos.length === 0) return 0
+  const now = Date.now()
+  /** @type {Map<string, object[]>} */
+  const byModel = new Map()
+  for (const p of promos) {
+    if (typeof p?.until === 'string' && Date.parse(p.until) <= now) continue // hide expired
+    const key = `${String(p.provider ?? '').toLowerCase()}|${String(p.model ?? '').toLowerCase()}`
+    const list = byModel.get(key)
+    if (list) list.push(p)
+    else byModel.set(key, [p])
+  }
+  if (byModel.size === 0) return 0
+  let matched = 0
+  for (const row of rows) {
+    const list = byModel.get(`${row.provider.toLowerCase()}|${row.modelId.toLowerCase()}`)
+    if (!list) continue
+    list.sort((a, b) => Date.parse(a.until) - Date.parse(b.until))
+    row.promo = { ...list[0], provider: undefined }
+    if (list.length > 1) row.promo.more = list.length - 1
+    matched++
+  }
+  return matched
+}

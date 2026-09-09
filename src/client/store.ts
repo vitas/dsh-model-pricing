@@ -125,7 +125,7 @@ export function createStore(fallback: PricingPayload | null) {
     const configured = new Set(payload.providers?.configured ?? [])
     let rows = payload.rows.filter((row) => {
       if (query && !`${row.name} ${row.modelId} ${row.providerName} ${row.provider}`.toLowerCase().includes(query)) return false
-      if (filters.tags.length > 0 && !filters.tags.every((tag) => row.tags.includes(tag))) return false
+      if (filters.tags.length > 0 && !filters.tags.every((tag) => (tag === 'promo' ? !!row.promo : row.tags.includes(tag)))) return false
       if (filters.onlyMine === 'configured' && !configured.has(row.provider)) return false
       return true
     })

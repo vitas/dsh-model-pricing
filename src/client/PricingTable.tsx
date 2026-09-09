@@ -90,7 +90,7 @@ function StatusLine({ state }: { state: ReturnType<Store['getState']> }) {
   const stale = status === 'cached'
   return (
     <span style={stale ? s.stale : s.status}>
-      {`${payload.source.name} · ${stamp} · ${tr('statsLine', { providers: num.format(payload.stats.providers), models: num.format(payload.stats.priced) })} · ${tr('estimates')} · ${tr('perMillion')}${stale ? ` · ${tr('stale')}` : ''}`}
+      {`${payload.source.name} · ${stamp} · ${tr('statsLine', { providers: num.format(payload.stats.providers), models: num.format(payload.stats.priced) })}${payload.stats.promotions ? ` · ${tr('promoCount', { n: payload.stats.promotions })}` : ''} · ${tr('estimates')} · ${tr('perMillion')}${stale ? ` · ${tr('stale')}` : ''}`}
     </span>
   )
 }
@@ -115,6 +115,24 @@ function Row({ row, expanded, onToggle, configured }: { row: PricingRow; expande
             </span>
           )}
           {divergent && <span title={tr('divergentTip')} style={{ color: 'var(--dsw-alias-state-warn-primary)' }}>⚠</span>}
+          {row.promo && (
+            <a
+              href={row.promo.url || undefined}
+              target="_blank"
+              rel="noreferrer noopener"
+              onClick={(e) => row.promo.url ? undefined : e.preventDefault()}
+              title={tr('promoTip', {
+                text: row.promo.promo,
+                until: row.promo.until,
+                more: row.promo.more ? tr('promoMore', { n: row.promo.more }) : '',
+                verifiedAt: row.promo.verifiedAt,
+                by: row.promo.by,
+              })}
+              style={{ ...s.badge, marginLeft: 6, color: 'var(--dsw-alias-brand-primary)', borderColor: 'var(--dsw-alias-brand-primary)', fontWeight: 600, textDecoration: 'none' }}
+            >
+              {row.promo.promo}
+            </a>
+          )}
         </td>
         <td style={s.td('right')}>{money(row.cost.input)}</td>
         <td style={s.td('right')}>{money(row.cost.output)}</td>
@@ -195,6 +213,10 @@ export function PricingTable({ store }: { store: Store }) {
         ))}
         <button style={s.chip(filters.onlyMine === 'configured')} aria-pressed={filters.onlyMine === 'configured'}
           onClick={() => store.setFilters({ onlyMine: filters.onlyMine === 'configured' ? 'off' : 'configured' })}>{tr('onlyMine')}</button>
+          {state.payload?.stats.promotions ? (
+            <button style={s.chip(filters.tags.includes('promo'))} aria-pressed={filters.tags.includes('promo')}
+              onClick={() => store.setFilters({ tags: filters.tags.includes('promo') ? filters.tags.filter((x) => x !== 'promo') : [...filters.tags, 'promo'] })}>{tr('promoChip')}</button>
+          ) : null}
         <button style={btnStyle} onClick={() => store.setFilters({ grouping: filters.grouping === 'provider' ? 'flat' : 'provider' })}>
           {filters.grouping === 'provider' ? tr('groupProvider') : tr('groupFlat')}
         </button>

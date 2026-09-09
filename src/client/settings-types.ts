@@ -6,7 +6,7 @@
  */
 export interface SettingsSnapshot {
   status: 'loading' | 'ready' | 'unavailable'
-  value: { sourceUrl?: string; ttlMinutes?: number; tagRules?: unknown } | undefined
+  value: { sourceUrl?: string; promoFeedUrl?: string; ttlMinutes?: number; tagRules?: unknown } | undefined
   base: unknown
   user: unknown
   revision: number | undefined

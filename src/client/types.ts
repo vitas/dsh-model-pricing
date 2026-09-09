@@ -44,14 +44,27 @@ export interface PricingRow {
   authoritative?: string
   /** Cross-provider comparison for the same model (A2); present in multi-provider groups. */
   compare?: { providers: number; cheapest: boolean; pctOver?: number; cheapestProvider?: string }
+  /** Active community-contribution promotion for this route; absent when none. */
+  promo?: {
+    promo: string
+    discountPct?: number
+    fixedCost?: { input?: number; output?: number; cacheRead?: number; cacheWrite?: number }
+    until: string
+    url?: string
+    verifiedAt: string
+    by: string
+    more?: number
+  }
 }
 
 export interface PricingPayload {
   generatedAt: string
   ttlSeconds: number
   source: { name: string; url: string }
-  stats: { providers: number; models: number; priced: number }
+  stats: { providers: number; models: number; priced: number; promotions?: number }
   providers: { configured: string[] }
+  /** Promotion feed provenance (the compiled feed URL, or null when disabled). */
+  promotions?: { source: string | null; count: number }
   rows: PricingRow[]
   fromCache?: boolean
   /** Embedded fallbacks ship a curated subset; flagged so the UI can say so. */

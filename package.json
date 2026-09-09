@@ -35,8 +35,10 @@
     "build": "node scripts/build-client.mjs",
     "snapshot": "node scripts/build-snapshot.mjs",
     "prepare": "node scripts/build-client.mjs",
-    "prepack": "node scripts/build-snapshot.mjs && node scripts/build-client.mjs",
-    "check": "node --check src/host/index.js && node --check src/host/catalog.js"
+    "prepack": "npm run snapshot && npm run build",
+    "check": "node --check src/host/index.js && node --check src/host/catalog.js",
+    "validate-promos": "node scripts/validate-promos.mjs",
+    "compile-promos": "node scripts/compile-promos.mjs"
   },
   "devDependencies": {
     "esbuild": "^0.25.0"

@@ -179,7 +179,7 @@ commit history and the release notes.
 |------|--------|
 | Epic A — pricing table | Done in v0.1.0 (A1–A7 incl. cross-provider comparison A2; tag-rule configuration A3 via settings) |
 | A8 — plugin settings | Done: `model-pricing` namespace (refresh interval, catalog source, tag rules) registered through `settings.installSection`, editable live via settings.yaml and via the Plugins-tab card (E4). Promotion-feed URL arrives with B3 |
-| Epic B — comparisons & promotions | Open (M2): B3 promotion feed, B2 coding-plan grouping |
+| Epic B — comparisons & promotions | B3 promotion feed done (schema, CI validation + compiled `gh-pages` feed, host attach, badge + filter chip). B1 family grouping and B2 coding-plan grouping remain |
 | Epic C — provider-card badges | Open (M2) |
 | Epic D — session cost | Deferred (M3) |
 | Epic E — engineering | E1–E4 done (E4 as of the M1 completion work; card shipped with the settings namespace) |

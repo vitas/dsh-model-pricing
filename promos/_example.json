@@ -1,0 +1,11 @@
+[
+  {
+    "model": "example-model-id",
+    "promo": "Example offer - 40% off the first month",
+    "discountPct": 40,
+    "until": "2099-01-01",
+    "url": "https://example.com/promotion",
+    "verifiedAt": "2026-09-01",
+    "by": "github-handle"
+  }
+]

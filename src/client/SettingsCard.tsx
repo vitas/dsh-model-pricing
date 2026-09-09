@@ -127,6 +127,11 @@ export function PricingSettingsCard(props: { scope: PricingScope }) {
     if (!/^https?:\/\/.+/.test(t)) throw new Error(tr('invalidUrl'))
     return t
   }
+  const toFeedUrl = (text: string) => {
+    const t = text.trim()
+    if (t && !/^https?:\/\/.+/.test(t)) throw new Error(tr('invalidUrl'))
+    return t // empty string = promotions disabled, a legitimate value
+  }
   const toRules = (text: string) => {
     const t = text.trim()
     if (!t) return undefined
@@ -171,6 +176,17 @@ export function PricingSettingsCard(props: { scope: PricingScope }) {
         parse={toUrl}
         onCommit={(u) => void props.scope.set('sourceUrl', u)}
         onReset={() => void props.scope.unset('sourceUrl')}
+      />
+      <Field
+        id="model-pricing-promofeed"
+        label={tr('promoFeedField')}
+        hint={tr('promoFeedHint')}
+        value={value.promoFeedUrl ?? ''}
+        overridden={'promoFeedUrl' in user}
+        disabled={disabled}
+        parse={toFeedUrl}
+        onCommit={(u) => void props.scope.set('promoFeedUrl', u)}
+        onReset={() => void props.scope.unset('promoFeedUrl')}
       />
       <Field
         id="model-pricing-tagrules"
