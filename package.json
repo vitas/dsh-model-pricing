@@ -1,0 +1,36 @@
+{
+  "name": "dsh-model-pricing",
+  "version": "0.1.0",
+  "description": "Model pricing and capabilities board for DeepSeek Harness, mounted into the Models settings page",
+  "type": "module",
+  "license": "Apache-2.0",
+  "main": "./src/host/index.js",
+  "exports": {
+    ".": "./src/host/index.js",
+    "./client": "./lib/client.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "src",
+    "lib",
+    "data"
+  ],
+  "dsh": {
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-settings-models"
+      ]
+    }
+  },
+  "scripts": {
+    "build": "node scripts/build-client.mjs",
+    "snapshot": "node scripts/build-snapshot.mjs",
+    "prepare": "node scripts/build-client.mjs",
+    "prepack": "node scripts/build-snapshot.mjs && node scripts/build-client.mjs",
+    "check": "node --check src/host/index.js && node --check src/host/catalog.js"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0"
+  }
+}
