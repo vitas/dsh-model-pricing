@@ -9,7 +9,8 @@ description: "DeepSeek Harness + Qwen3.8-Flash on a free API promotion: 28 commi
 
 Chicken-and-egg, in one screenshot: I wrote `dsh-model-pricing` — a plugin that
 shows model prices inside DeepSeek Harness — using **Qwen3.8-Flash**, which the
-plugin itself currently marks as *"free on the B.AI API"*. The offer was
+plugin itself currently marks as *"Qwen3.8-Flash API at 0 Credits (free)",* with a
+source link, a verification date, and "end not announced" in the text. The offer was
 verified against B.AI's published promotion notices the same evening I started,
 with a re-verification date stamped into the record. So yes: total LLM cost of
 this project, so far, is $0 — with the honesty caveat the whole article is
