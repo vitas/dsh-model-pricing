@@ -253,3 +253,11 @@ PR body (short, factual):
 3. Day 2+: Show HN and Reddit (mention the list inclusion if merged), X thread
    same day.
 4. Outreach (7) any time; independent.
+
+---
+
+## 8. LinkedIn
+
+Personal-account post (not company page) linking the dev.to article. Body in
+`docs/linkedin-post.md`; replace the `[ARTICLE URL]` placeholder after the
+dev.to publish. The first two lines are the pre-fold hook — keep them.
