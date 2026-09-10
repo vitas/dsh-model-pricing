@@ -59,8 +59,9 @@ free API promotion — and the loop was unusually tight because the harness coul
 
 I drove in Russian; every artifact — code comments, commit messages, docs,
 CHANGELOG — was required to be English, professional, no jargon. Across 28
-commits and three language dictionaries (66 keys × en/zh/ru, parity-checked in
-CI) the model never once broke that discipline. That, honestly, was the
+commits and three language dictionaries (66 keys × en/zh/ru; a dependency-free CI gate now
+fails any pull request that drifts them — added while writing this, because I
+was about to claim it without having it) the model never once broke that discipline. That, honestly, was the
 surprise. If you've ever merged an AI session that sprinkled "🚀" into
 production changelogs, you'll know what I mean.
 
