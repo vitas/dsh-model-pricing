@@ -38,6 +38,7 @@
     "prepack": "npm run snapshot && npm run build",
     "check": "node --check src/host/index.js && node --check src/host/catalog.js",
     "validate-promos": "node scripts/validate-promos.mjs",
+    "check-locales": "node scripts/check-locales.mjs",
     "compile-promos": "node scripts/compile-promos.mjs"
   },
   "devDependencies": {

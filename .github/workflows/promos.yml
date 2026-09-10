@@ -25,6 +25,8 @@ jobs:
           node-version: 20
       - name: Validate promotion records
         run: node scripts/validate-promos.mjs
+      - name: Locale parity
+        run: node scripts/check-locales.mjs
 
   publish:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
