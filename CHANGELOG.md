@@ -4,6 +4,29 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow
 semantic versioning.
 
+## [Unreleased]
+
+### Fixed
+- **Comparison badges no longer go silent when a route is listed at $0.**
+  Genuine free-tier listings (Azure, HuggingFace and similar) are now flagged
+  `free` and excluded from the comparison baseline; paid routes in the same
+  group compare against the cheapest paid route. Before this, any group whose
+  winner listed $0 produced no comparison at all — 2,773 of 7,178 rows had no
+  actionable badge.
+- **"Only mine" can no longer dead-end an empty table.** A configured provider
+  id that matches no priced catalog row (local test providers, gateways whose
+  catalog key differs) now falls back to showing all providers with a
+  explanatory banner instead of silently emptying the section.
+
+### Changed
+- **The `cheapest` badge states a catalog claim, not a market fact.** It reads
+  "cheapest listed", and when the winning route is less than half the listed
+  first-party price for that model family (Anthropic/OpenAI/Google/DeepSeek/
+  Moonshot/xAI/Mistral/Zhipu/Qwen/MiniMax anchors), it is rendered with a
+  warning tone and ⚠ naming the official reference. The `+N% vs` badges keep
+  their percentage (it is true of the catalog) but flag an unverified baseline
+  in their tooltip.
+
 ## [0.2.0] - 2026-09-09
 
 ### Added

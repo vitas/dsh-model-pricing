@@ -104,13 +104,15 @@ age block (§6), and a Docs link.
 |-------|-------|-------|
 | Capability tag (`Coding`, `Agentic`, `Vision`, `Long context`, `Open weights`, `Structured output`) | neutral chip, secondary label | rows (§A3 engine) |
 | `−N% vs <provider>` | success fill | B1 (M2) |
-| `cheapest` | success outline | B1 (M2) |
+| `cheapest` | success outline; warn outline + ⚠ when under half the first-party listing | B1 (M2), verify policy |
+| `free` | success outline | $0 non-plan listing (excluded from baseline) |
 | `Promotion — 50% · until Oct 1` | warning fill, date monospaced | B3/B4 (M2–M3) |
 | Divergence `⚠` in a price cell | tooltip: "catalog says $X, your route charges $Y" | merge flags (§4.2 arch) |
 | `stale` | warning chip in the status line | §3 |
 | `plan` (flat-rate) | brand outline; `$N/mo` replaces per-1M cells | B2 (M2) |
 
-At most one status badge per row at once; priority order: promotion > cheapest >
+At most one comparison badge per row (free | cheapest | +N% — mutually exclusive by
+construction); promotion badges sit alongside them; priority order: promotion > cheapest >
 stale. Capability tags do not count against this limit.
 
 ## 6. Source and trust

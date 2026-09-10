@@ -63,7 +63,18 @@ export interface PricingRow {
   experimental?: boolean
   authoritative?: string
   /** Cross-provider comparison for the same model (A2); present in multi-provider groups. */
-  compare?: { providers: number; cheapest: boolean; pctOver?: number; cheapestProvider?: string }
+  free?: boolean
+  /** Cross-provider comparison metadata; see annotateComparisons in the host. */
+  compare?: {
+    providers: number
+    cheapest?: boolean
+    pctOver?: number
+    cheapestProvider?: string
+    /** Cheapest paid route far below the first-party listing — verify before relying. */
+    verify?: boolean
+    baselineVerify?: boolean
+    officialProvider?: string
+  }
   /** Subscription plan (coding/token plan): the $0 per-token prices are nominal. */
   flatPlan?: boolean
   /** Active community-contribution promotion for this route; absent when none. */

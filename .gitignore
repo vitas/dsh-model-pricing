@@ -19,3 +19,8 @@ dist/
 # generated data plane (rebuild: npm run snapshot)
 data/
 promo-dist/
+
+# personal announcement copy (lives on the personal site, not in the package)
+docs/announcements.md
+docs/linkedin-post.md
+docs/devto-article.md

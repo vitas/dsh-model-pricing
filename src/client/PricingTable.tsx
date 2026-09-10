@@ -104,14 +104,20 @@ function Row({ row, expanded, onToggle, configured }: { row: PricingRow; expande
       <tr onClick={onToggle} style={{ cursor: 'pointer' }}>
         <td style={s.td('left')}>
           {configured ? '● ' : ''}{row.name}{' '}
-          {cmp?.cheapest && (
-            <span title={tr('cheapestTip', { n: cmp.providers })}
+          {row.free && (
+            <span title={tr('freeTip')}
               style={{ ...s.badge, color: 'var(--dsw-alias-state-success-primary)', borderColor: 'var(--dsw-alias-state-success-primary)' }}>
-              {tr('cheapestBadge', { n: cmp.providers })}
+              {tr('freeBadge')}
+            </span>
+          )}
+          {cmp?.cheapest && (
+            <span title={tr('cheapestTip', { n: cmp.providers }) + (cmp.verify ? ' — ' + tr('verifyTip', { official: cmp.officialProvider ?? '' }) : '')}
+              style={{ ...s.badge, color: cmp.verify ? 'var(--dsw-alias-state-warn-primary)' : 'var(--dsw-alias-state-success-primary)', borderColor: cmp.verify ? 'var(--dsw-alias-state-warn-primary)' : 'var(--dsw-alias-state-success-primary)' }}>
+              {tr('cheapestBadge', { n: cmp.providers })}{cmp.verify ? ' ⚠' : ''}
             </span>
           )}
           {cmp && !cmp.cheapest && cmp.pctOver != null && cmp.pctOver >= 10 && (
-            <span title={tr('overTip', { n: cmp.providers, pct: cmp.pctOver })} style={{ ...s.badge, color: 'var(--dsw-alias-label-tertiary)' }}>
+            <span title={tr('overTip', { n: cmp.providers, pct: cmp.pctOver }) + (cmp.baselineVerify ? ' — ' + tr('baselineVerifyTip') : '')} style={{ ...s.badge, color: 'var(--dsw-alias-label-tertiary)' }}>
               {tr('overBadge', { pct: cmp.pctOver, provider: cmp.cheapestProvider })}
             </span>
           )}
@@ -225,6 +231,11 @@ export function PricingTable({ store }: { store: Store }) {
         </button>
       </div>
       <ProviderPromoPanel store={store} />
+      {store.configuredMiss() && (
+        <div style={{ ...s.status, color: 'var(--dsw-alias-state-warn-primary)' }}>
+          {tr('onlyMineMiss', { list: (store.getState().payload?.providers?.configured ?? []).join(', ') })}
+        </div>
+      )}
       {rows.length === 0 && <div style={s.status}>{tr('emptyFilter')}</div>}
       {[...groups.entries()].map(([g, grows]) => {
         const open = filters.grouping === 'flat' || openGroups.has(g)

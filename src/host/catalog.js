@@ -96,6 +96,52 @@ export function pruneModelsDev(document, tagRulesConfig) {
  * v0.1 metric; blended cost is P1 per decision Q4) and how far above the
  * cheapest the row sits. Pure; called once per snapshot build.
  */
+// First-party anchors: the family prefix of the model id mapped to the
+// developer's own provider entry in the catalog. Used purely as a sanity
+// reference — when the group's cheapest paid route undercuts the first-party
+// listing by more than 2x, that route is flagged for verification instead of
+// silently becoming the baseline the market is said to prove.
+const FIRST_PARTY = {
+  claude: 'anthropic',
+  gpt: 'openai',
+  chatgpt: 'openai',
+  gemini: 'google',
+  deepseek: 'deepseek',
+  kimi: 'moonshotai',
+  grok: 'xai',
+  mistral: 'mistral',
+  codestral: 'mistral',
+  devstral: 'mistral',
+  glm: 'zhipuai',
+  qwen: 'alibaba',
+  minimax: 'minimax',
+}
+
+function firstPartyProvider(modelId) {
+  const id = String(modelId).toLowerCase()
+  const slash = id.lastIndexOf('/')
+  const bare = slash >= 0 ? id.slice(slash + 1) : id
+  for (const [family, provider] of Object.entries(FIRST_PARTY)) {
+    if (!bare.startsWith(family)) continue
+    const next = bare[family.length]
+    if (next === undefined || !/[a-z0-9]/.test(next)) return provider
+  }
+  return undefined
+}
+
+/**
+ * Attach comparison metadata to rows. Three policies, learned from live data:
+ *  1. $0 subscription plans (flatPlan) never join a group at all (0.2.0).
+ *  2. Genuine $0 listings (free tiers) carry a `free` flag and are NOT the
+ *     comparison baseline — paid routes compare against the cheapest PAID
+ *     route, so groups containing a free winner still produce real
+ *     comparisons instead of silence (2,773 rows were silent before this).
+ *  3. A baseline that is less than half the first-party listing for a
+ *     first-party-anchored model is flagged `verify`: the badge then states
+ *     the catalog claim and names the doubt, instead of asserting the market.
+ * `pctOver` on the other rows keeps its meaning, but is only computed against
+ * the paid baseline; `baselineVerify` propagates the doubt to the `+N%` badge.
+ */
 export function annotateComparisons(rows) {
   const canonical = (modelId) => {
     let id = String(modelId).toLowerCase()
@@ -108,6 +154,7 @@ export function annotateComparisons(rows) {
   }
   const groups = new Map()
   for (const row of rows) {
+    row.free = !row.flatPlan && effPrice(row) === 0
     if (row.flatPlan) continue // $0 subscription prices are not comparable per-token routes
     const key = canonical(row.modelId)
     if (key.length < 5) continue
@@ -121,16 +168,22 @@ export function annotateComparisons(rows) {
       if (!existing || effPrice(row) < effPrice(existing)) byProvider.set(row.provider, row)
     }
     if (byProvider.size < 2) continue
-    const winners = [...byProvider.values()].sort((a, b) => effPrice(a) - effPrice(b))
-    const best = winners[0]
+    const paid = [...byProvider.values()].filter((r) => effPrice(r) > 0).sort((a, b) => effPrice(a) - effPrice(b))
+    const bestPaid = paid[0]
+    const officialId = firstPartyProvider(group[0].modelId)
+    const official = officialId ? byProvider.get(officialId) : undefined
+    const verify = !!bestPaid && !!official && bestPaid !== official && effPrice(official) > 0 && effPrice(bestPaid) * 2 < effPrice(official)
     for (const row of group) {
       const price = effPrice(row)
-      const ratio = effPrice(best) > 0 && Number.isFinite(price) ? price / effPrice(best) : NaN
+      const ratio = !row.free && bestPaid && row !== bestPaid ? price / effPrice(bestPaid) : NaN
       row.compare = {
         providers: byProvider.size,
-        cheapest: row === best,
+        cheapest: !row.free && !!bestPaid && row === bestPaid,
         pctOver: Number.isFinite(ratio) ? Math.round((ratio - 1) * 100) : undefined,
-        cheapestProvider: best.providerName,
+        cheapestProvider: bestPaid?.providerName,
+        verify: row === bestPaid ? verify : undefined,
+        baselineVerify: verify && row !== bestPaid ? true : undefined,
+        officialProvider: verify ? official?.providerName : undefined,
       }
     }
   }

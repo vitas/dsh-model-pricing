@@ -119,18 +119,34 @@ export function createStore(fallback: PricingPayload | null) {
     }
   }
 
+  let configuredMiss = false
+  const normalizeId = (id: string) => String(id).toLowerCase().replace(/[^a-z0-9]/g, '')
+
   /** Rows after filters/sort applied; stable order by provider+model within equal keys. */
   function visibleRows(): PricingRow[] {
     const { payload, filters } = state
     if (!payload) return []
     const query = filters.query.trim().toLowerCase()
-    const configured = new Set(payload.providers?.configured ?? [])
+    const configured = new Set((payload.providers?.configured ?? []).map(normalizeId))
+    // A configured id that names no priced row (local/test provider ids, or a
+    // custom gateway whose catalog key differs) would otherwise render an
+    // empty table — a dead end for anyone trying the filter first. Flag the
+    // miss, show all rows and let the banner explain.
+    configuredMiss = false
     let rows = payload.rows.filter((row) => {
       if (query && !`${row.name} ${row.modelId} ${row.providerName} ${row.provider}`.toLowerCase().includes(query)) return false
       if (filters.tags.length > 0 && !filters.tags.every((tag) => (tag === 'promo' ? !!row.promo : row.tags.includes(tag)))) return false
-      if (filters.onlyMine === 'configured' && !configured.has(row.provider)) return false
+      if (filters.onlyMine === 'configured' && !configured.has(normalizeId(row.provider))) return false
       return true
     })
+    if (filters.onlyMine === 'configured' && configured.size > 0 && rows.length === 0) {
+      configuredMiss = true
+      rows = payload.rows.filter((row) => {
+        if (query && !`${row.name} ${row.modelId} ${row.providerName} ${row.provider}`.toLowerCase().includes(query)) return false
+        if (filters.tags.length > 0 && !filters.tags.every((tag) => (tag === 'promo' ? !!row.promo : row.tags.includes(tag)))) return false
+        return true
+      })
+    }
     const key = filters.sort.key
     const dir = filters.sort.dir === 'asc' ? 1 : -1
     rows = rows.slice().sort((a, b) => {
@@ -209,6 +225,8 @@ export function createStore(fallback: PricingPayload | null) {
     },
     getState: () => state,
     visibleRows,
+    /** True while "only mine" matched nothing and the table fell back to all rows. */
+    configuredMiss: () => configuredMiss,
     providerSummary,
       allProviderOffers,
   providerOffers,

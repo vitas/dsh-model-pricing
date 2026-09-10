@@ -34,9 +34,7 @@ below were verified against the live ecosystem on 2026-09-09; anything marked
      zh: 'DSH 设置页中的模型价格表：基于 models.dev 的每 100 万 token 价格并叠加本地目录，含能力标签、跨供应商比价和社区促销信息源。'
    ```
 
-   (`description.en` must end with a period; quote it because it contains ": ".
-   Post texts for every channel, and the exact submission commands, live in
-   `docs/announcements.md`.)
+   (`description.en` must end with a period; quote it because it contains ": ".)
    Listing requirements: installs through `dsh plugin add` (a `dsh.bundle`
    manifest is what makes that possible), accurate one-line description,
    reasonable category, maintained repo. The correct category is `model`
