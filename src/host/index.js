@@ -133,6 +133,7 @@ function normalizeSettings(raw = {}) {
     tagRules: raw.tagRules,
     promoFeedUrl:
       typeof raw.promoFeedUrl === 'string' ? raw.promoFeedUrl : DEFAULT_PROMO_URL,
+    sessionWindowDays: Number.isFinite(raw.sessionWindowDays) && raw.sessionWindowDays > 0 ? raw.sessionWindowDays : 30,
   }
 }
 
@@ -165,6 +166,7 @@ export async function apply(ctx, config = {}) {
       sourceUrl: z.string().default(DEFAULT_SOURCE_URL),
       promoFeedUrl: z.string().default(DEFAULT_PROMO_URL),
       ttlMinutes: z.number().default(Math.round(DEFAULT_TTL_MS / 60_000)),
+      sessionWindowDays: z.number().default(30),
       tagRules: z.any(),
     })
     ctx.inject(['settings'], (c) => {
@@ -340,9 +342,13 @@ export async function apply(ctx, config = {}) {
       path: ROUTE_SESSIONS,
       handler: async (req, res) => {
         try {
-          if (!sessionsCache || Date.now() - sessionsCache.at > 60_000) {
+          if (!sessionsCache || sessionsCache.window !== settings.sessionWindowDays || Date.now() - sessionsCache.at > 60_000) {
             const snap = await current(false)
-            sessionsCache = { at: Date.now(), data: summarizeSessions(snap.payload.rows, sessionsRoot(), canonicalModelId) }
+            sessionsCache = {
+              at: Date.now(),
+              window: settings.sessionWindowDays,
+              data: summarizeSessions(snap.payload.rows, sessionsRoot(), canonicalModelId, { windowDays: settings.sessionWindowDays }),
+            }
           }
           sendJson(res, 200, JSON.stringify(sessionsCache.data), undefined, req)
         } catch (error) {

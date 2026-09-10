@@ -167,6 +167,17 @@ export function PricingSettingsCard(props: { scope: PricingScope }) {
         onReset={() => void props.scope.unset('ttlMinutes')}
       />
       <Field
+        id="model-pricing-sesswin"
+        label={tr('sessWinField')}
+        hint={tr('sessWinHint')}
+        value={value.sessionWindowDays == null ? '' : String(value.sessionWindowDays)}
+        overridden={'sessionWindowDays' in user}
+        disabled={disabled}
+        parse={toNumber}
+        onCommit={(n) => void props.scope.set('sessionWindowDays', n)}
+        onReset={() => void props.scope.unset('sessionWindowDays')}
+      />
+      <Field
         id="model-pricing-source"
         label={tr('sourceField')}
         hint={tr('sourceHint')}

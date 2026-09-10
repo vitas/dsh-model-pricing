@@ -5,6 +5,7 @@
  * docs/design.md §7). All copy goes through `tr()` — see src/client/locales.ts.
  */
 import * as React from 'react'
+import { Fragment } from 'react'
 import { TAG_LABELS } from '../shared/tags.mjs'
 import { tr } from './i18n.js'
 import type { Store } from './store.js'
@@ -300,23 +301,46 @@ function SessionCostPanel({ store }: { store: Store }) {
     m.confidence === 'estimated' && m.minUsd != null
       ? tr('confEstimated', { min: usd(m.minUsd), max: usd(m.maxUsd ?? 0) })
       : tr(`conf${m.confidence.charAt(0).toUpperCase()}${m.confidence.slice(1)}`)
-  const shown = sessions.sessions.slice(0, 8)
+  // Group by workspace: costs are felt per project, not as a flat feed.
+  const byWs = new Map<string, typeof sessions.sessions>()
+  for (const sess of sessions.sessions) {
+    const list = byWs.get(sess.workspace) ?? []
+    list.push(sess)
+    byWs.set(sess.workspace, list)
+  }
   return (
     <div style={s.promoPanel}>
       <div style={{ fontWeight: 600, marginBottom: 4 }}>
         {tr('sessTitle')}{' '}
         <span style={{ color: 'var(--dsw-alias-label-tertiary)', fontWeight: 400 }}>
           {tr('sessTotals', { spend: usd(sessions.totals.actualUsd), saved: usd(sessions.totals.savedUsd), n: sessions.totals.sessions })}
+          {' · '}
+          {tr('sessThisMonth', { x: usd(sessions.totals.monthUsd) })}
+          {sessions.windowDays ? ` · ${tr('sessWindow', { d: sessions.windowDays })}` : ''}
         </span>
       </div>
       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
         <tbody>
-          {shown.map((sess) => {
+          {[...byWs.entries()].map(([ws, wsSessions]) => {
+            const wsTotal = wsSessions.reduce((a, x) => a + x.actualUsd, 0)
+            const wsSaved = wsSessions.reduce((a, x) => a + x.savedUsd, 0)
+            return (
+            <Fragment key={ws}>
+              <tr>
+                <td colSpan={4} style={{ ...s.sessTd, fontWeight: 600 }}>
+                  {ws.length > 30 ? `${ws.slice(0, 30)}…` : ws}{' '}
+                  <span style={{ color: 'var(--dsw-alias-label-tertiary)', fontWeight: 400 }}>
+                    {usd(wsTotal)}
+                    {wsSaved > 0.00005 && <span style={{ color: 'var(--dsw-alias-state-success-primary)' }}> · {tr('sessSaved', { x: usd(wsSaved) })}</span>}
+                  </span>
+                </td>
+              </tr>
+          {wsSessions.slice(0, 4).map((sess) => {
             const top = sess.models.slice(0, 2)
             const extra = sess.models.length - top.length
             return (
               <tr key={sess.id}>
-                <td style={s.sessTd}>{sess.workspace.length > 22 ? `${sess.workspace.slice(0, 22)}…` : sess.workspace}</td>
+                <td style={{ ...s.sessTd, paddingLeft: 14 }}>{new Date(sess.updatedAt).toLocaleDateString()}</td>
                 <td style={s.sessTd}>
                   {top.map((m) => (
                     <span key={m.provider + m.model} title={confTip(m)} style={{ marginRight: 8 }}>
@@ -329,11 +353,14 @@ function SessionCostPanel({ store }: { store: Store }) {
                 <td style={{ ...s.sessTd, textAlign: 'right' }}>{tr('sessTurns', { n: sess.turns })}</td>
                 <td style={{ ...s.sessTd, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
                   {usd(sess.actualUsd)}
-                  {sess.savedUsd > 0.00005 && (
-                    <span style={{ color: 'var(--dsw-alias-state-success-primary)' }}> · {tr('sessSaved', { x: usd(sess.savedUsd) })}</span>
-                  )}
                 </td>
               </tr>
+            )
+          })}
+              {wsSessions.length > 4 && (
+                <tr><td colSpan={4} style={{ ...s.sessTd, color: 'var(--dsw-alias-label-tertiary)', paddingLeft: 14 }}>{tr('sessMoreSessions', { n: wsSessions.length - 4 })}</td></tr>
+              )}
+            </Fragment>
             )
           })}
         </tbody>

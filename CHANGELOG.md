@@ -15,6 +15,10 @@ semantic versioning.
   actual cost and report the list-price difference as savings, and the panel
   hides silently when the data is not there. Local files only; labeled an
   estimate, never a bill.
+- Session-cost polish: `sessionWindowDays` setting (default 30) bounds which
+  sessions are estimated and summed; the panel groups by workspace with per-project
+  subtotals and reports the current calendar month (local time) as its own figure,
+  so the number tracks how costs are actually felt.
 
 ### Fixed
 - **Comparison badges no longer go silent when a route is listed at $0.**

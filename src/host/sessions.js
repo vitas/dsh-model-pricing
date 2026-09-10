@@ -162,10 +162,18 @@ function withPromo(row, listCost) {
  * @param {string} root sessions directory (injectable for tests)
  * @param {(id: string) => string} canonical model-id normalizer from catalog.js
  */
-export function summarizeSessions(rows, root = sessionsRoot(), canonical) {
+export function summarizeSessions(rows, root = sessionsRoot(), canonical, opts = {}) {
   const perModel = new Map() // "provider|model" -> aggregates
   const sessions = []
-  const files = listSessionFiles(root)
+  // Calendar bounds: the window drops stale sessions entirely; "this month" is
+  // a reporting slice inside whatever the window kept. Local time on purpose —
+  // budgets are felt in the user's timezone, not UTC.
+  const now = Date.now()
+  const windowDays = Number.isFinite(opts.windowDays) && opts.windowDays > 0 ? opts.windowDays : null
+  const cutoff = windowDays ? now - windowDays * 86_400_000 : -Infinity
+  const d0 = new Date(now)
+  const monthStart = new Date(d0.getFullYear(), d0.getMonth(), 1).getTime()
+  const files = listSessionFiles(root).filter((f) => f.mtime >= cutoff)
   let unreadable = 0
   for (const entry of files) {
     let replay
@@ -213,6 +221,7 @@ export function summarizeSessions(rows, root = sessionsRoot(), canonical) {
       id: entry.id,
       workspace: entry.workspace,
       updatedAt: new Date(entry.mtime).toISOString(),
+      thisMonth: entry.mtime >= monthStart,
       turns: replay.turns,
       models: parts.sort((a, b) => (b.actualUsd ?? b.maxUsd ?? 0) - (a.actualUsd ?? a.maxUsd ?? 0)),
       listUsd: round(listUsd),
@@ -221,8 +230,8 @@ export function summarizeSessions(rows, root = sessionsRoot(), canonical) {
     })
   }
   const totals = sessions.reduce(
-    (acc, s) => ({ list: acc.list + s.listUsd, actual: acc.actual + s.actualUsd, saved: acc.saved + s.savedUsd }),
-    { list: 0, actual: 0, saved: 0 },
+    (acc, s) => ({ list: acc.list + s.listUsd, actual: acc.actual + s.actualUsd, saved: acc.saved + s.savedUsd, month: acc.month + (s.thisMonth ? s.actualUsd : 0) }),
+    { list: 0, actual: 0, saved: 0, month: 0 },
   )
   const models = [...perModel.values()]
     .map((m) => {
@@ -248,7 +257,8 @@ export function summarizeSessions(rows, root = sessionsRoot(), canonical) {
     scanned: files.length,
     sessions: sessions.slice(0, 24),
     models,
-    totals: { listUsd: round(totals.list), actualUsd: round(totals.actual), savedUsd: round(totals.saved), sessions: sessions.length, unreadable },
+    windowDays,
+    totals: { listUsd: round(totals.list), actualUsd: round(totals.actual), savedUsd: round(totals.saved), monthUsd: round(totals.month), sessions: sessions.length, unreadable },
   }
 }
 

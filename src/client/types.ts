@@ -109,10 +109,12 @@ export interface SessionModelCost {
 export interface SessionCostSummary {
   generatedAt: string
   scanned?: number
+  windowDays?: number | null
   sessions: Array<{
     id: string
     workspace: string
     updatedAt: string
+    thisMonth: boolean
     turns: number
     models: SessionModelCost[]
     listUsd: number
@@ -120,7 +122,7 @@ export interface SessionCostSummary {
     savedUsd: number
   }>
   models: SessionModelCost[]
-  totals: { listUsd: number; actualUsd: number; savedUsd: number; sessions: number; unreadable: number }
+  totals: { listUsd: number; actualUsd: number; savedUsd: number; monthUsd: number; sessions: number; unreadable: number }
 }
 
 export interface PricingPayload {
