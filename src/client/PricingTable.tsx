@@ -8,7 +8,7 @@ import * as React from 'react'
 import { TAG_LABELS } from '../shared/tags.mjs'
 import { tr } from './i18n.js'
 import type { Store } from './store.js'
-import type { PricingRow } from './types.js'
+import type { PricingRow , SessionModelCost} from './types.js'
 
 const { useState, useSyncExternalStore, useCallback } = React
 
@@ -53,6 +53,7 @@ const s = {
   table: { width: '100%', borderCollapse: 'collapse' } as React.CSSProperties,
   th: (align: 'left' | 'right'): React.CSSProperties => ({ textAlign: align, padding: '4px 8px', fontSize: 11, color: 'var(--dsw-alias-label-tertiary)', fontWeight: 500, cursor: 'pointer', userSelect: 'none' }),
   td: (align: 'left' | 'right'): React.CSSProperties => ({ textAlign: align, padding: '4px 8px', borderTop: '1px solid var(--dsw-alias-border-l1)', fontVariantNumeric: 'tabular-nums' }),
+  sessTd: { padding: '2px 8px 2px 0', fontSize: '0.82em', verticalAlign: 'top' } as const,
   promoPanel: { margin: '8px 0', padding: '8px 10px', border: '1px solid var(--dsw-alias-border-l2)', borderRadius: 8, background: 'var(--dsw-alias-bg-secondary)', fontSize: 13 },
   badge: { fontSize: 11, padding: '0 6px', borderRadius: 10, border: '1px solid var(--dsw-alias-border-l2)', marginRight: 4, whiteSpace: 'nowrap' as const },
   detail: { padding: '8px 12px', background: 'var(--dsw-alias-bg-layer-1)', color: 'var(--dsw-alias-label-secondary)', fontSize: 12, whiteSpace: 'pre-wrap' } as React.CSSProperties,
@@ -231,6 +232,7 @@ export function PricingTable({ store }: { store: Store }) {
         </button>
       </div>
       <ProviderPromoPanel store={store} />
+      <SessionCostPanel store={store} />
       {store.configuredMiss() && (
         <div style={{ ...s.status, color: 'var(--dsw-alias-state-warn-primary)' }}>
           {tr('onlyMineMiss', { list: (store.getState().payload?.providers?.configured ?? []).join(', ') })}
@@ -281,7 +283,67 @@ export function PricingTable({ store }: { store: Store }) {
  * (e.g. B.AI) that have no rows in the pricing catalog — this is the answer to
  * "where are the current promotions" and links each offer to its source.
  */
-export function ProviderPromoPanel({ store }: { store: Store }) {
+export 
+/**
+ * Session-cost panel (D1): local session logs × catalog prices. Absent or
+ * empty data hides the panel entirely — the estimate is an extra, never an
+ * error surface. Confidence marks the pricing join, mirroring the table's
+ * honesty policy: routed (harness catalog) and listed (provider id matched)
+ * print a number; unmatched providers print a range; unknown models nothing.
+ */
+function SessionCostPanel({ store }: { store: Store }) {
+  const { sessions } = store.getState()
+  if (!sessions || !sessions.sessions.length) return null
+  const usd = (v: number) => `$${v < 0.01 ? v.toFixed(4) : v.toFixed(2)}`
+  const confIcon: Record<string, string> = { routed: '✓', listed: '•', estimated: '~', missing: '?' }
+  const confTip = (m: SessionModelCost) =>
+    m.confidence === 'estimated' && m.minUsd != null
+      ? tr('confEstimated', { min: usd(m.minUsd), max: usd(m.maxUsd ?? 0) })
+      : tr(`conf${m.confidence.charAt(0).toUpperCase()}${m.confidence.slice(1)}`)
+  const shown = sessions.sessions.slice(0, 8)
+  return (
+    <div style={s.promoPanel}>
+      <div style={{ fontWeight: 600, marginBottom: 4 }}>
+        {tr('sessTitle')}{' '}
+        <span style={{ color: 'var(--dsw-alias-label-tertiary)', fontWeight: 400 }}>
+          {tr('sessTotals', { spend: usd(sessions.totals.actualUsd), saved: usd(sessions.totals.savedUsd), n: sessions.totals.sessions })}
+        </span>
+      </div>
+      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <tbody>
+          {shown.map((sess) => {
+            const top = sess.models.slice(0, 2)
+            const extra = sess.models.length - top.length
+            return (
+              <tr key={sess.id}>
+                <td style={s.sessTd}>{sess.workspace.length > 22 ? `${sess.workspace.slice(0, 22)}…` : sess.workspace}</td>
+                <td style={s.sessTd}>
+                  {top.map((m) => (
+                    <span key={m.provider + m.model} title={confTip(m)} style={{ marginRight: 8 }}>
+                      {m.model}
+                      <span style={{ color: 'var(--dsw-alias-label-tertiary)' }}> {confIcon[m.confidence] ?? ''}</span>
+                    </span>
+                  ))}
+                  {extra > 0 && <span style={{ color: 'var(--dsw-alias-label-tertiary)' }}>{tr('sessMoreModels', { n: extra })}</span>}
+                </td>
+                <td style={{ ...s.sessTd, textAlign: 'right' }}>{tr('sessTurns', { n: sess.turns })}</td>
+                <td style={{ ...s.sessTd, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+                  {usd(sess.actualUsd)}
+                  {sess.savedUsd > 0.00005 && (
+                    <span style={{ color: 'var(--dsw-alias-state-success-primary)' }}> · {tr('sessSaved', { x: usd(sess.savedUsd) })}</span>
+                  )}
+                </td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+      <div style={{ color: 'var(--dsw-alias-label-tertiary)', marginTop: 4 }}>{tr('sessHint')}</div>
+    </div>
+  )
+}
+
+function ProviderPromoPanel({ store }: { store: Store }) {
   const state = useSyncExternalStore(store.subscribe, store.getState)
   const entries = state.payload ? store.allProviderOffers() : []
   if (entries.length === 0) return null

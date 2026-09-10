@@ -90,6 +90,39 @@ export interface PricingRow {
   }
 }
 
+/** One (provider, model) slice of session usage priced against the catalog. */
+export interface SessionModelCost {
+  provider: string
+  model: string
+  input: number
+  output: number
+  cacheRead: number
+  /** routed | listed | estimated | missing — see summarizeSessions in the host. */
+  confidence: string
+  listUsd?: number
+  actualUsd?: number
+  savedUsd?: number
+  minUsd?: number
+  maxUsd?: number
+}
+
+export interface SessionCostSummary {
+  generatedAt: string
+  scanned?: number
+  sessions: Array<{
+    id: string
+    workspace: string
+    updatedAt: string
+    turns: number
+    models: SessionModelCost[]
+    listUsd: number
+    actualUsd: number
+    savedUsd: number
+  }>
+  models: SessionModelCost[]
+  totals: { listUsd: number; actualUsd: number; savedUsd: number; sessions: number; unreadable: number }
+}
+
 export interface PricingPayload {
   generatedAt: string
   ttlSeconds: number

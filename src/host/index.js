@@ -19,15 +19,18 @@ import {
   DEFAULT_SOURCE_URL,
   annotateComparisons,
   attachPromos,
+  canonicalModelId,
   fetchModelsDev,
   fetchPromoFeed,
   pruneModelsDev,
 } from './catalog.js'
+import { sessionsRoot, summarizeSessions } from './sessions.js'
 
 
 const PLUGIN_ID = 'dsh-model-pricing'
 const ROUTE_SNAPSHOT = '/model-pricing/snapshot'
 const ROUTE_REFRESH = '/model-pricing/refresh'
+const ROUTE_SESSIONS = '/model-pricing/sessions'
 const DEFAULT_TTL_MS = 6 * 60 * 60 * 1000
 
 /**
@@ -78,7 +81,7 @@ const numberOrUndef = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : 
 /**
  * Overlay authoritative pi-ai prices onto models.dev rows and flag divergence.
  * Rows present in both with >10% disagreement on input or output get a
- * `divergent` source stamp. Pure function; unit-tested.
+ * `divergent` source stamp. Pure function, unit-tested.
  */
 export function mergePiAi(rows, catalog) {
   if (!catalog || catalog.size === 0) return rows
@@ -329,9 +332,28 @@ export async function apply(ctx, config = {}) {
         }
       },
     })
+    // Session-cost estimation: local logs, catalog prices, 60-second cache.
+    // Deliberately its own route — the payload is big, the panel is optional.
+    let sessionsCache = null
+    const disposeSessions = webServer.register({
+      kind: 'exact',
+      path: ROUTE_SESSIONS,
+      handler: async (req, res) => {
+        try {
+          if (!sessionsCache || Date.now() - sessionsCache.at > 60_000) {
+            const snap = await current(false)
+            sessionsCache = { at: Date.now(), data: summarizeSessions(snap.payload.rows, sessionsRoot(), canonicalModelId) }
+          }
+          sendJson(res, 200, JSON.stringify(sessionsCache.data), undefined, req)
+        } catch (error) {
+          sendJson(res, 503, JSON.stringify({ error: 'sessions_unavailable', detail: String(error?.message ?? error) }), undefined, req)
+        }
+      },
+    })
     c.effect(() => () => {
       disposeSnapshot?.()
       disposeRefresh?.()
+      disposeSessions?.()
     })
   }
 

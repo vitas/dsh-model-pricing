@@ -4,7 +4,7 @@
  * Plain module state — one Models page instance per browser tab in practice.
  */
 
-import type { PricingPayload, PricingRow } from './types.js'
+import type { PricingPayload, PricingRow, SessionCostSummary } from './types.js'
 
 export type LoadStatus = 'idle' | 'loading' | 'live' | 'cached' | 'embedded' | 'absent' | 'error'
 
@@ -23,6 +23,8 @@ export interface StoreState {
   error?: string
   ageMs?: number
   payload?: PricingPayload
+  /** Local session-cost summary from /model-pricing/sessions (loaded after the catalog). */
+  sessions?: SessionCostSummary | null
   filters: Filters
   collapsed: boolean
 }
@@ -86,6 +88,18 @@ export function createStore(fallback: PricingPayload | null) {
     }
   }
 
+  /** Session costs load behind the catalog; failure or absence hides the panel. */
+  async function fetchSessions() {
+    try {
+      const response = await fetch('/model-pricing/sessions', { headers: { accept: 'application/json' }, cache: 'no-cache' })
+      if (!response.ok) return
+      const data = (await response.json()) as SessionCostSummary
+      if (Array.isArray(data?.sessions)) set({ sessions: data })
+    } catch {
+      /* estimation is an extra; never an error surface */
+    }
+  }
+
   async function load(force = false) {
     const seq = ++loadSeq
     set({ status: 'loading', error: undefined })
@@ -99,6 +113,7 @@ export function createStore(fallback: PricingPayload | null) {
         payload,
         ageMs: Date.now() - Date.parse(payload!.generatedAt),
       })
+      void fetchSessions()
     } catch (error) {
       if (seq !== loadSeq) return
       useFallback(error)

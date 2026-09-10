@@ -142,16 +142,25 @@ function firstPartyProvider(modelId) {
  * `pctOver` on the other rows keeps its meaning, but is only computed against
  * the paid baseline; `baselineVerify` propagates the doubt to the `+N%` badge.
  */
+/**
+ * Canonical model-id for cross-provider grouping and cost joins: strips
+ * provider prefixes (openrouter-style), version pins (bedrock ":0"/"@2025...")
+ * and release-date suffixes, then reduces to lowercase alphanumerics. Exported
+ * so the session-cost estimator joins on exactly the same key the table groups
+ * on — divergence between the two would silently mismatch prices to routes.
+ */
+export function canonicalModelId(modelId) {
+  let id = String(modelId).toLowerCase()
+  const slash = id.lastIndexOf('/')
+  if (slash >= 0) id = id.slice(slash + 1) // openrouter-style provider prefix
+  id = id.replace(/[:@]\w+$/, '') // bedrock-style version pins (":0", "@20250805")
+  id = id.replace(/-20\d{6}$/, '') // release-date suffixes
+  id = id.replace(/[^a-z0-9]+/g, '')
+  return id
+}
+
 export function annotateComparisons(rows) {
-  const canonical = (modelId) => {
-    let id = String(modelId).toLowerCase()
-    const slash = id.lastIndexOf('/')
-    if (slash >= 0) id = id.slice(slash + 1) // openrouter-style provider prefix
-    id = id.replace(/[:@]\w+$/, '') // bedrock-style version pins (":0", "@20250805")
-    id = id.replace(/-20\d{6}$/, '') // release-date suffixes
-    id = id.replace(/[^a-z0-9]+/g, '')
-    return id
-  }
+  const canonical = canonicalModelId
   const groups = new Map()
   for (const row of rows) {
     row.free = !row.flatPlan && effPrice(row) === 0

@@ -6,6 +6,16 @@ semantic versioning.
 
 ## [Unreleased]
 
+### Added
+- **Session-cost estimation (D1–D3)**: `GET /model-pricing/sessions` replays the
+  harness's own zstd session logs (multi-frame), attributes every usage chunk to
+  the (provider, model) route active at that step — including mid-session model
+  switches — and prices it against the live catalog. Confidence is explicit
+  (`routed` / `listed` / `estimated` range / `missing`), promotions price the
+  actual cost and report the list-price difference as savings, and the panel
+  hides silently when the data is not there. Local files only; labeled an
+  estimate, never a bill.
+
 ### Fixed
 - **Comparison badges no longer go silent when a route is listed at $0.**
   Genuine free-tier listings (Azure, HuggingFace and similar) are now flagged
