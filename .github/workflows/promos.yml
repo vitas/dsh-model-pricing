@@ -9,11 +9,15 @@ on:
       - '.github/workflows/promos.yml'
       - 'scripts/validate-promos.mjs'
       - 'scripts/compile-promos.mjs'
+      - 'scripts/check-locales.mjs'
+      - 'src/client/locales.ts'
   push:
     branches: [main]
     paths:
       - 'promos/**'
       - '.github/workflows/promos.yml'
+      - 'scripts/check-locales.mjs'
+      - 'src/client/locales.ts'
 
 jobs:
   validate:
