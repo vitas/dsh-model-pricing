@@ -76,7 +76,11 @@ Screenshot for all posts: `assets/screenshot.png`.
 
 ## 2. Show HN
 
-**Title:** `Show HN: Model pricing board for DeepSeek Harness – 7k models, cheapest-route comparison`
+**URL field:** `https://github.com/vitas/dsh-model-pricing` (the repo, so the
+visit-the-site click goes there). **Title** (HN limit is 80 chars, this is 76):
+`Show HN: Model pricing board for DeepSeek Harness: 7k models, cheapest route`
+
+**Text field:**
 
 > Text:
 >
