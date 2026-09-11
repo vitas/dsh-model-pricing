@@ -4,7 +4,7 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow
 semantic versioning.
 
-## [Unreleased]
+## [0.4.0] - 2026-09-11
 
 ### Added
 - **Cache-leak attribution (Epic D5–D6)**: the session panel now quantifies history

@@ -1,10 +1,12 @@
 # dsh-model-pricing
 
-**Compare LLM API prices before you pick a model.** A plugin for
+**Compare LLM API prices before you pick a model — and see what you actually paid
+after you used it.** A plugin for
 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (DSH) that puts a
-**model pricing and capability table** directly into your DSH settings: per-1M-token
-input/output/cache prices, context window, coding/agentic/vision/long-context tags,
-and which reachable route is cheapest for the same model right now.
+**model pricing and capability table** directly into your DSH settings (~7,250 priced
+models, 213 providers), and then reads your own session logs through the same catalog:
+per-project spend priced by the route you actually called, and the dollars your prompt
+cache is silently losing.
 
 [![npm](https://img.shields.io/npm/v/dsh-model-pricing)](https://www.npmjs.com/package/dsh-model-pricing)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
@@ -13,8 +15,8 @@ and which reachable route is cheapest for the same model right now.
 
 ![dsh-model-pricing pricing table rendered in the DSH Models settings page](assets/screenshot.png)
 
-*The pricing table in the DSH **Settings → Models** page: cross-provider `cheapest`
-badges, capability tags, and per-1M-token prices.*
+*The pricing table in the DSH **Settings → Models** page: cross-provider
+`lowest listed` badges, capability tags, and per-1M-token prices.*
 
 ## Why
 
@@ -27,18 +29,30 @@ your own machine.
 ## Features
 
 - **Pricing table** for every connectable model — input / output / cache-read price
-  per 1M tokens, context window, and max output (213 providers, ~7,200 priced models)
+  per 1M tokens, context window, and max output (213 providers, ~7,250 priced models)
 - **Capability tags** computed from structured catalog fields: Coding, Agentic,
   Vision, Long context, Open weights, Structured output — with user-configurable rules
 - **Authoritative routing prices**: for models DSH can actually invoke, the harness's
   own bundled `pi-ai` catalog overrides the public catalog, and price divergences
   larger than 10% are flagged row by row
-- **Automatic cross-provider comparison** for the same model (`−N% vs …`, `cheapest`)
+- **Honest cross-provider comparison**: the winner badge says *lowest listed* — a
+  claim about the catalog, not the market — $0 free tiers compare only against free
+  tiers, and a route listed below half the first-party price is flagged ⚠ to verify
 - **Community promotion feed**: verified, time-boxed offers rendered as badges with
   provenance tooltips and a one-click filter; contributed through reviewed pull
   requests and validated by CI (`promos/README.md`)
-- Planned next: badges inside provider cards, a `/pricing` command, and
-  approximate per-session cost
+- **Session costs, priced by the actual route**: replays the harness's own session
+  logs — including mid-session model switches — and sums what each project spent per
+  (provider, model), with an explicit confidence ladder (routed > listed > estimated
+  range > nothing shown) and promo-adjusted savings next to list price
+- **Cache-leak attribution**: what share of your spend is history re-billed at full
+  input price instead of cached price, split by cause — idle gaps past documented
+  provider TTLs, route switches, unattributed — and never charging compaction, which
+  is the opposite of a leak
+- English, Chinese and Russian UI, parity-checked in CI
+
+Planned next: badges inside provider cards, a `/pricing` command, and cost
+projection before compaction.
 
 ## Install
 
@@ -70,8 +84,11 @@ outbound traffic is an anonymous read of public catalog data:
   for the routes you can invoke
 - the promotion feed served as static JSON from this repository
 
-Every displayed price is labeled with its source and freshness. Prices are estimates
-for model selection, not billing data — your provider's invoice is the only authority.
+Session costs and cache leaks are computed from the local session logs under your
+DSH home directory and stay on your machine — nothing is uploaded to see them.
+Every displayed price is labeled with its source and freshness. Prices, cost and
+leak figures are estimates for model selection, not billing data — your provider's
+invoice is the only authority.
 
 ## Documentation
 
