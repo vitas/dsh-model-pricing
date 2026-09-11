@@ -89,13 +89,16 @@ Releases: v0.1 = Epics A + E; v0.2 = Epic B (automatic part) + Epic C; v0.3 = Ep
 | C1 | `settings.models.provider-card` slot | A compact line inside each provider card: price range across that provider's configured models, "cheapest route" chip, active promotions for that provider |
 | C2 | React to editing | The card knows the user's model list; badges reflect the effective list, not the raw catalog |
 
-### Epic D — Commands and session cost (P2)
+### Epic D — Session cost & cache intelligence (P2, cost half shipped 2026-09-11)
 
-| ID | Feature | Details |
-|----|---------|---------|
-| D1 | `/pricing` popup | Price of the current model plus the three closest alternatives by blended price, using the same popup mechanism as `/model` |
-| D2 | "This session ≈ $N" | `ctx.tokenMeter.measure(session)` (tokens) multiplied by the route price; shown in the `/pricing` popup and, if a supported extension point exists, in the stats strip (open question Q5) |
-| D3 | Projection before compaction | `contextPressure.projectedTokens` times the route price → "the next request ≈ $X" |
+| ID | Feature | Status |
+|----|---------|--------|
+| D1 | `/pricing` popup | deferred — command surface (same mechanism as `/model`), untouched |
+| D2 | Session cost, priced by actual route | shipped (unreleased): zstd multi-frame replay of the harness's own session logs; each usage chunk attributed to the `(provider, model)` route active at that step (`request/context`, fallback `model/selection`) — mid-session switches handled; prices from the same catalog the table renders, with a confidence ladder `routed > listed > estimated (range) > missing`; promo-adjusted actual + `savedUsd` counterfactual. `GET /model-pricing/sessions` |
+| D3 | Window, grouping, month | shipped (unreleased): `sessionWindowDays` setting (default 30), per-workspace subtotals, current-month total on the local calendar; compaction-safe |
+| D4 | Projection before compaction | deferred — needs the `contextPressure` seam (related open question Q5) |
+| D5 | Cache-leak attribution | shipped (unreleased): history re-billed at full input price beyond genuine context growth = leak; causes ordered `switch > ttl (documented provider TTL only) > other`; shrunk contexts (compaction) are never charged; undocumented TTLs fold into `other` rather than being invented; only price-resolvable routes count |
+| D6 | Leak panel | shipped (unreleased): warn-toned total + split with full-policy tooltip above the session table; hides below $0.005 |
 
 ### Epic E — Infrastructure (P0)
 
@@ -185,7 +188,7 @@ commit history and the release notes.
 | A8 — plugin settings | Done: `model-pricing` namespace (refresh interval, catalog source, tag rules) registered through `settings.installSection`, editable live via settings.yaml and via the Plugins-tab card (E4). Promotion-feed URL arrives with B3 |
 | Epic B — comparisons & promotions | B3 promotion feed done (schema, CI validation + compiled feed on the `feed` branch, host attach, row badges + filter chip, whole-provider records with a current-promotions panel and provider-card chips; seeded with the eight documented B.AI offers). B2 done: subscription-plan providers (models.dev names matching `coding|token plan`) are flagged `flatPlan`, collected into one 'Coding & token plans' group, shown with a 'sub.' cell instead of nominal $0, and excluded from cross-provider comparison so a subscription price can never win 'cheapest' (39 routes were being mislabeled before this fix) |
 | Epic C — provider-card badges | Deferred to M3: the keyed `settings.models.provider-card` seam is an internal contract; registering it from an out-of-tree plugin would depend on undocumented key semantics (same category as Q5) |
-| Epic D — session cost | Deferred (M3) |
+| Epic D — session cost | D2/D3/D5/D6 shipped (unreleased since 2026-09-11); D1 (`/pricing`) and D4 (projection) deferred |
 | Epic E — engineering | E1–E4 done (E4 as of the M1 completion work; card shipped with the settings namespace) |
 | v0.1.0 | Published to npm (2026-09-09); tagged on GitHub |
 

@@ -4,6 +4,17 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow
 semantic versioning.
 
+## [Unreleased]
+
+### Added
+- **Cache-leak attribution (Epic D5–D6)**: the session panel now quantifies history
+  re-billed at full input price instead of the cached price, split by cause —
+  route switches, idle gaps over documented provider cache TTLs, and unattributed
+  events (provider eviction, prompt edits). Compaction is never counted as a leak
+  (a shrunk context is the user saving money), and providers without a documented
+  TTL fold expiry leaks into `other` instead of getting an invented number. Only
+  price-resolvable routes contribute. Measured on a real workload: 25% of spend.
+
 ## [0.3.0] - 2026-09-11
 
 ### Added
