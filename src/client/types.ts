@@ -115,6 +115,7 @@ export interface SessionCostSummary {
     workspace: string
     updatedAt: string
     thisMonth: boolean
+    leaks: { ttlUsd: number; switchUsd: number; otherUsd: number; hitRate: number | null }
     turns: number
     models: SessionModelCost[]
     listUsd: number
@@ -122,7 +123,7 @@ export interface SessionCostSummary {
     savedUsd: number
   }>
   models: SessionModelCost[]
-  totals: { listUsd: number; actualUsd: number; savedUsd: number; monthUsd: number; sessions: number; unreadable: number }
+  totals: { listUsd: number; actualUsd: number; savedUsd: number; monthUsd: number; leakTtlUsd: number; leakSwitchUsd: number; leakOtherUsd: number; sessions: number; unreadable: number }
 }
 
 export interface PricingPayload {

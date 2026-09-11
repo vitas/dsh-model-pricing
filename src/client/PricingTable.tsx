@@ -319,6 +319,20 @@ function SessionCostPanel({ store }: { store: Store }) {
           {sessions.windowDays ? ` · ${tr('sessWindow', { d: sessions.windowDays })}` : ''}
         </span>
       </div>
+      {(() => {
+        const leak = sessions.totals.leakTtlUsd + sessions.totals.leakSwitchUsd + sessions.totals.leakOtherUsd
+        if (leak <= 0.005) return null
+        const parts = [
+          sessions.totals.leakTtlUsd > 0 && tr('leakTtl', { x: usd(sessions.totals.leakTtlUsd) }),
+          sessions.totals.leakSwitchUsd > 0 && tr('leakSwitch', { x: usd(sessions.totals.leakSwitchUsd) }),
+          sessions.totals.leakOtherUsd > 0 && tr('leakOther', { x: usd(sessions.totals.leakOtherUsd) }),
+        ].filter(Boolean)
+        return (
+          <div style={{ fontSize: '0.82em', color: 'var(--dsw-alias-state-warn-primary)', marginBottom: 6 }} title={tr('leakHint')}>
+            {tr('leakTitle', { x: usd(leak) })} — {parts.join(' · ')}
+          </div>
+        )
+      })()}
       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
         <tbody>
           {[...byWs.entries()].map(([ws, wsSessions]) => {

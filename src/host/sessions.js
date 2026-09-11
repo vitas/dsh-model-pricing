@@ -54,6 +54,32 @@ function decompressZstd(buf) {
 const MAX_SESSIONS = 60
 
 /**
+ * Vendor prompt-cache idle TTLs, ms, as documented by each provider (checked
+ * 2026-09). Providers without a documented TTL are deliberately absent: their
+ * expiry leaks fold into `other` rather than being invented. Values are the
+ * conservative reading (Anthropic's 5-minute default, not the paid 1-hour
+ * tier) — this figures feed an ESTIMATE badge, never a bill.
+ */
+const CACHE_TTL_MS = {
+  anthropic: 300_000,
+  claude: 300_000,
+  openai: 600_000,
+  google: 300_000,
+  gemini: 300_000,
+  moonshot: 300_000,
+  kimi: 300_000,
+}
+
+/** Idle TTL for a configured provider id, or null when undocumented. */
+function cacheTtl(provider) {
+  const id = normalizeProviderId(provider)
+  for (const [key, ms] of Object.entries(CACHE_TTL_MS)) {
+    if (id === key || id.startsWith(key)) return ms
+  }
+  return null
+}
+
+/**
  * Sessions root, honoring the harness's own home layout. `DSH_HOME` is set for
  * the web process; the default matches the CLI's storage location.
  */
@@ -91,6 +117,7 @@ function safeReadDir(path) {
 function replaySession(text) {
   let current = { provider: 'unknown', model: 'unknown' }
   const usage = new Map()
+  const timeline = [] // ordered usage events for cache-leak attribution
   const turns = new Set()
   for (const line of text.split('\n')) {
     if (!line) continue
@@ -115,9 +142,17 @@ function replaySession(text) {
     bucket.output += num(u.outputTokens)
     bucket.cacheRead += num(u.cacheReadTokens)
     // reasoningTokens is a subset of outputTokens in this format — never add it.
+    timeline.push({
+      t: num(event.time),
+      provider: current.provider,
+      model: current.model,
+      input: num(u.inputTokens),
+      output: num(u.outputTokens),
+      cacheRead: num(u.cacheReadTokens),
+    })
   }
   for (const bucket of usage.values()) bucket.turns = turns.size
-  return { usage, turns: turns.size }
+  return { usage, timeline, turns: turns.size }
 }
 
 const num = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : 0)
@@ -145,6 +180,56 @@ const priceOf = (row, field) => (typeof row.cost[field] === 'number' ? row.cost[
 const usd = (row, b) => (b.input * priceOf(row, 'input') + b.output * priceOf(row, 'output') + b.cacheRead * priceOf(row, 'cacheRead')) / 1e6
 const cheapest = (rows) => rows.slice().sort((a, b) => priceOf(a, 'output') - priceOf(b, 'output'))[0]
 const dearest = (rows) => rows.slice().sort((a, b) => priceOf(b, 'output') - priceOf(a, 'output'))[0]
+
+/**
+ * Attribute cache re-billing to causes. Invariant: the full context of step i
+ * is roughly input+cacheRead+output of the same step; growth over the previous
+ * step's context is genuinely new content. Anything billed as fresh input
+ * beyond that growth is history re-billed at full price — the leak. Cause
+ * picks the cheapest explanation: route switch, then documented-TTL expiry,
+ * then "other" (compaction, prompt edits, provider-side eviction). Leaks are
+ * priced with the SAME join the cost table uses; unresolvable routes drop out
+ * rather than borrow a neighbor's price.
+ */
+function attributeLeaks(timeline, rows, canonical) {
+  const out = { ttlUsd: 0, switchUsd: 0, otherUsd: 0, hitRate: null }
+  let prev = null
+  let inAll = 0
+  let cacheAll = 0
+  for (const ev of timeline) {
+    inAll += ev.input
+    cacheAll += ev.cacheRead
+    if (prev) {
+      const ctxNow = ev.input + ev.cacheRead + ev.output
+      const ctxPrev = prev.input + prev.cacheRead + prev.output
+      // A shrunk context is a compaction (or fresh start): its input is the new
+      // baseline history, not re-billed old tokens — counting it would fine the
+      // user for the very action that saves money.
+      const grew = Math.max(0, ctxNow - ctxPrev)
+      const leakTok = ctxNow < ctxPrev ? 0 : Math.max(0, ev.input - grew)
+      const switched = ev.provider !== prev.provider || ev.model !== prev.model
+      const gap = ev.t - prev.t
+      const ttl = cacheTtl(ev.provider)
+      const cause = switched ? 'switch' : ttl && gap > ttl ? 'ttl' : leakTok > 0 ? 'other' : null
+      if (cause && leakTok > 0) {
+        const res = resolveRows(rows, canonical, ev.provider, ev.model)
+        const row = res.kind === 'listed' || res.kind === 'routed' ? res.row : null
+        if (row) {
+          const premium = (priceOf(row, 'input') - priceOf(row, 'cacheRead')) / 1e6
+          const usdLeak = leakTok * premium
+          if (premium > 0 && usdLeak > 0.000001) out[cause === 'switch' ? 'switchUsd' : cause === 'ttl' ? 'ttlUsd' : 'otherUsd'] += usdLeak
+        }
+      }
+    }
+    prev = ev
+  }
+  const total = inAll + cacheAll
+  out.hitRate = total > 0 ? cacheAll / total : null
+  out.ttlUsd = round(out.ttlUsd)
+  out.switchUsd = round(out.switchUsd)
+  out.otherUsd = round(out.otherUsd)
+  return out
+}
 
 /** Promo-adjusted cost: free tiers and percentage discounts, vs the list price. */
 function withPromo(row, listCost) {
@@ -217,7 +302,9 @@ export function summarizeSessions(rows, root = sessionsRoot(), canonical, opts =
       parts.push(part)
     }
     if (!parts.length) continue
+    const leaks = attributeLeaks(replay.timeline, rows, canonical)
     sessions.push({
+      leaks,
       id: entry.id,
       workspace: entry.workspace,
       updatedAt: new Date(entry.mtime).toISOString(),
@@ -230,8 +317,16 @@ export function summarizeSessions(rows, root = sessionsRoot(), canonical, opts =
     })
   }
   const totals = sessions.reduce(
-    (acc, s) => ({ list: acc.list + s.listUsd, actual: acc.actual + s.actualUsd, saved: acc.saved + s.savedUsd, month: acc.month + (s.thisMonth ? s.actualUsd : 0) }),
-    { list: 0, actual: 0, saved: 0, month: 0 },
+    (acc, s) => ({
+      list: acc.list + s.listUsd,
+      actual: acc.actual + s.actualUsd,
+      saved: acc.saved + s.savedUsd,
+      month: acc.month + (s.thisMonth ? s.actualUsd : 0),
+      ttl: acc.ttl + s.leaks.ttlUsd,
+      switch: acc.switch + s.leaks.switchUsd,
+      other: acc.other + s.leaks.otherUsd,
+    }),
+    { list: 0, actual: 0, saved: 0, month: 0, ttl: 0, switch: 0, other: 0 },
   )
   const models = [...perModel.values()]
     .map((m) => {
@@ -258,7 +353,7 @@ export function summarizeSessions(rows, root = sessionsRoot(), canonical, opts =
     sessions: sessions.slice(0, 24),
     models,
     windowDays,
-    totals: { listUsd: round(totals.list), actualUsd: round(totals.actual), savedUsd: round(totals.saved), monthUsd: round(totals.month), sessions: sessions.length, unreadable },
+    totals: { listUsd: round(totals.list), actualUsd: round(totals.actual), savedUsd: round(totals.saved), monthUsd: round(totals.month), leakTtlUsd: round(totals.ttl), leakSwitchUsd: round(totals.switch), leakOtherUsd: round(totals.other), sessions: sessions.length, unreadable },
   }
 }
 
