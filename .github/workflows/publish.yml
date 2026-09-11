@@ -24,7 +24,11 @@ jobs:
       - name: Remove any token-based npmrc (trusted publishing must not race it)
         run: rm -f "$HOME/.npmrc"
       - name: Build package artifacts
-        run: npm ci && npm run prepack
+        run: npm ci --ignore-scripts && npm run prepack
+        # --ignore-scripts on ci: the `prepare` lifecycle would otherwise run
+        # build-client mid-install, before the prepack step has generated the
+        # embedded fallback snapshot it imports. esbuild resolves its binary
+        # through optionalDependencies, so skipping install scripts is safe.
       - name: Publish to npm
         # No credentials configured on purpose: npm exchanges the OIDC id-token
         # for a short-lived publish token (trusted publishing + provenance).
