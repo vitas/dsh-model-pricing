@@ -1,0 +1,102 @@
+{
+  "generatedAt": "2026-09-12T05:50:32.461Z",
+  "count": 8,
+  "promos": [
+    {
+      "provider": "b-ai",
+      "model": "glm-5.3-flash",
+      "promo": "GLM-5.3-Flash API at 0 Credits (free); chat free on launch. End not announced",
+      "fixedCost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0
+      },
+      "until": "2026-10-10",
+      "url": "https://docs.b.ai/llmservice/promotions-and-pricing-notices/",
+      "verifiedAt": "2026-09-09",
+      "by": "vitas (official docs)"
+    },
+    {
+      "provider": "b-ai",
+      "model": "qwen3.8-flash",
+      "promo": "Qwen3.8-Flash API at 0 Credits (free); chat free on launch. End not announced",
+      "fixedCost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0
+      },
+      "until": "2026-10-10",
+      "url": "https://docs.b.ai/llmservice/promotions-and-pricing-notices/",
+      "verifiedAt": "2026-09-09",
+      "by": "vitas (official docs)"
+    },
+    {
+      "provider": "b-ai",
+      "model": "hy3",
+      "promo": "Hy3 at 0 Credits (API and chat) since Aug 21, 2026. End not announced",
+      "fixedCost": {
+        "input": 0,
+        "output": 0
+      },
+      "until": "2026-10-10",
+      "url": "https://docs.b.ai/llmservice/promotions-and-pricing-notices/",
+      "verifiedAt": "2026-09-09",
+      "by": "vitas (official docs)"
+    },
+    {
+      "provider": "b-ai",
+      "model": "mimo-v2.5",
+      "promo": "MiMo-V2.5 API at 0 Credits (free) since Aug 24, 2026. End not announced",
+      "fixedCost": {
+        "input": 0,
+        "output": 0
+      },
+      "until": "2026-10-10",
+      "url": "https://docs.b.ai/llmservice/promotions-and-pricing-notices/",
+      "verifiedAt": "2026-09-09",
+      "by": "vitas (official docs)"
+    },
+    {
+      "provider": "b-ai",
+      "model": "deepseek-v4-flash",
+      "promo": "DeepSeek-V4-Flash API at 50% of standard price since Sep 3, 2026 (tracks DeepSeek idle/busy periods)",
+      "discountPct": 50,
+      "until": "2026-10-10",
+      "url": "https://docs.b.ai/llmservice/promotions-and-pricing-notices/",
+      "verifiedAt": "2026-09-09",
+      "by": "vitas (official docs)"
+    },
+    {
+      "provider": "b-ai",
+      "model": "deepseek-v4-flash-vision-exp",
+      "promo": "DeepSeek-V4-Flash-Vision-Exp API at 50% of standard price since Sep 3, 2026",
+      "discountPct": 50,
+      "until": "2026-10-10",
+      "url": "https://docs.b.ai/llmservice/promotions-and-pricing-notices/",
+      "verifiedAt": "2026-09-09",
+      "by": "vitas (official docs)"
+    },
+    {
+      "provider": "b-ai",
+      "model": "glm-5.2",
+      "promo": "GLM-5.2 billed at 60% of standard price (40% off) since Aug 12, 2026. End not announced",
+      "discountPct": 40,
+      "until": "2026-10-10",
+      "url": "https://docs.b.ai/llmservice/promotions-and-pricing-notices/",
+      "verifiedAt": "2026-09-09",
+      "by": "vitas (official docs)"
+    },
+    {
+      "provider": "b-ai",
+      "model": "glm-5.3",
+      "promo": "GLM-5.3 billed at 90% of standard price (10% off) since Aug 14, 2026. End not announced",
+      "discountPct": 10,
+      "until": "2026-10-10",
+      "url": "https://docs.b.ai/llmservice/promotions-and-pricing-notices/",
+      "verifiedAt": "2026-09-09",
+      "by": "vitas (official docs)"
+    }
+  ]
+}
