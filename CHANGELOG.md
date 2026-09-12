@@ -4,6 +4,16 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow
 semantic versioning.
 
+## [Unreleased]
+
+### Added
+- **Route performance intelligence (Epic D7–D8)**: per-(provider, model) medians of
+  time-to-first-token and output speed, reconstructed from local session logs
+  (step-windowed, delta-encoded stream timestamps decoded), shown beside the list
+  output price in a quadrant table — cheap & fast / cheap & slow / premium & quick /
+  overpriced & slow. Routes with fewer than five samples are never labelled;
+  medians, not means, so one bad retry cannot poison a route.
+
 ## [0.4.0] - 2026-09-11
 
 ### Added

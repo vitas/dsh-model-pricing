@@ -379,6 +379,41 @@ function SessionCostPanel({ store }: { store: Store }) {
           })}
         </tbody>
       </table>
+      {(() => {
+        const perf = sessions.models.filter((m) => (m.ttftN ?? 0) > 0 || (m.speedN ?? 0) > 0).slice(0, 6)
+        if (!perf.length) return null
+        const priced = perf.filter((m) => m.outPrice != null)
+        const med = (arr: number[]) => { const s = arr.slice().sort((a, b) => a - b); return s[Math.floor(s.length / 2)] ?? 0 }
+        const medP = priced.length > 1 ? med(priced.map((m) => m.outPrice as number)) : Infinity
+        const medT = perf.length > 1 ? med(perf.map((m) => m.ttftP50Ms ?? Infinity)) : 0
+        const quad = (m: SessionModelCost) => {
+          if (m.outPrice == null || (m.ttftN ?? 0) < 5) return null
+          const cheap = m.outPrice <= medP
+          const fast = (m.ttftP50Ms ?? Infinity) <= medT
+          return cheap && fast ? 'qCheapFast' : cheap ? 'qCheapSlow' : fast ? 'qPriceyFast' : 'qAvoid'
+        }
+        return (
+          <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 6 }}>
+            <tbody>
+              <tr>
+                <td style={{ ...s.sessTd, color: 'var(--dsw-alias-label-tertiary)', fontWeight: 600 }} colSpan={5}>{tr('routePerfTitle')}</td>
+              </tr>
+              {perf.map((m) => {
+                const q = quad(m)
+                return (
+                  <tr key={m.provider + m.model}>
+                    <td style={s.sessTd}>{m.model}<span style={{ color: 'var(--dsw-alias-label-tertiary)' }}> @{m.provider}</span></td>
+                    <td style={{ ...s.sessTd, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }} title={tr('perfSamples', { n: m.ttftN ?? 0 })}>{m.ttftP50Ms ? `${Math.round(m.ttftP50Ms / 1000)}s` : '—'}</td>
+                    <td style={{ ...s.sessTd, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }} title={tr('perfSamples', { n: m.speedN ?? 0 })}>{m.tokPerS ?? '—'}</td>
+                    <td style={{ ...s.sessTd, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{m.outPrice != null ? `$${m.outPrice}` : '—'}</td>
+                    <td style={s.sessTd}>{q && <span style={{ color: q === 'qCheapFast' ? 'var(--dsw-alias-state-success-primary)' : q === 'qAvoid' ? 'var(--dsw-alias-state-warn-primary)' : 'var(--dsw-alias-label-secondary)' }}> {tr(q)}</span>}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        )
+      })()}
       <div style={{ color: 'var(--dsw-alias-label-tertiary)', marginTop: 4 }}>{tr('sessHint')}</div>
     </div>
   )

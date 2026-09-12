@@ -104,6 +104,11 @@ export interface SessionModelCost {
   savedUsd?: number
   minUsd?: number
   maxUsd?: number
+  ttftP50Ms?: number
+  ttftN?: number
+  tokPerS?: number
+  speedN?: number
+  outPrice?: number
 }
 
 export interface SessionCostSummary {

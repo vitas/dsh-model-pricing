@@ -116,9 +116,23 @@ function safeReadDir(path) {
  */
 function replaySession(text) {
   let current = { provider: 'unknown', model: 'unknown' }
+  // Event timestamps are mixed: lifecycle events carry absolute `time`, the
+  // streamed chunk lines carry a near-absolute `time0` whose residual equals
+  // the count of preceding stream events (verified on real logs). Rebuild
+  // absolute time as max(time0, lastAbs + 1ms): exactness is unnecessary for
+  // a median, monotonicity is not — clamping keeps firstChunk >= request.
+  let lastAbs = 0
   const usage = new Map()
   const timeline = [] // ordered usage events for cache-leak attribution
   const turns = new Set()
+  // Route-performance raw observations, joined by (turn, step) (Epic G):
+  // duration = usage.t - step/start.t, speed = output tokens / duration,
+  // ttft = first content chunk - request/context.t. The usage chunk is the
+  // step's closing stamp — assistant/message follows it within ~1 ms.
+  const stepStartAt = new Map() // "turn|step" -> time
+  const stepWindow = new Map() // active "turn|step" -> [start, end] — stream chunks outside a step window are idle/human time
+  const firstChunkAt = new Map() // "turn|step" -> time of first text/reasoning chunk
+  const perf = [] // { provider, model, kind: 'speed'|'ttft', value }
   for (const line of text.split('\n')) {
     if (!line) continue
     let event
@@ -127,8 +141,27 @@ function replaySession(text) {
     // request/context fires per API call and carries the route actually used;
     // model/selection is the UI switch. Both retarget the active route —
     // request/context first when present, since it sits closest to the usage.
+    if (num(event.time)) lastAbs = event.time
     if ((event.type === 'request/context' || event.type === 'model/selection') && data.model) {
       current = { provider: String(data.provider ?? 'unknown'), model: String(data.model) }
+      continue
+    }
+    if (event.type === 'step/start' && data.turn != null) {
+      const k = `${data.turn}|${data.step}`
+      stepStartAt.set(k, num(event.time))
+      stepWindow.set(k, [num(event.time), Infinity])
+      continue
+    }
+    if (event.type === 'step/end' && data.turn != null) {
+      const w = stepWindow.get(`${data.turn}|${data.step}`)
+      if (w) w[1] = num(event.time)
+      continue
+    }
+    if ((event.type === 'text-chunks' || event.type === 'reasoning-chunks') && data.turn != null) {
+      const k = `${data.turn}|${data.step}`
+      const abs = Math.max(num(event.time0), lastAbs ? lastAbs + 1 : 0)
+      const w = stepWindow.get(k)
+      if (!firstChunkAt.has(k) && w && abs >= w[0] && abs <= w[1]) firstChunkAt.set(k, abs)
       continue
     }
     const chunk = event.type === 'assistant/chunk' ? data.chunk : undefined
@@ -142,17 +175,24 @@ function replaySession(text) {
     bucket.output += num(u.outputTokens)
     bucket.cacheRead += num(u.cacheReadTokens)
     // reasoningTokens is a subset of outputTokens in this format — never add it.
-    timeline.push({
-      t: num(event.time),
-      provider: current.provider,
-      model: current.model,
-      input: num(u.inputTokens),
-      output: num(u.outputTokens),
-      cacheRead: num(u.cacheReadTokens),
-    })
+    const tEv = num(event.time)
+    timeline.push({ t: tEv, provider: current.provider, model: current.model, input: num(u.inputTokens), output: num(u.outputTokens), cacheRead: num(u.cacheReadTokens) })
+    const routeKey = `${current.provider}\u0000${current.model}`
+    const outTok = num(u.outputTokens)
+    const durMs = tEv - (stepStartAt.get(`${data.turn}|${data.step}`) ?? NaN)
+    if (outTok >= 20 && Number.isFinite(durMs) && durMs > 300 && durMs < 10 * 60_000) {
+      perf.push({ ...current, kind: 'speed', value: (outTok / durMs) * 1000 })
+    }
+    // TTFT anchored at step/start, not request/context: the context event
+    // fires once per TURN (verified on real logs) — anchoring to it made every
+    // step after the first inherit a stale t0 (worst observed: 1.7 h "latency").
+    // step/start differs from request/header by <10 ms and exists per step.
+    const first = firstChunkAt.get(`${data.turn}|${data.step}`)
+    const t0 = stepStartAt.get(`${data.turn}|${data.step}`)
+    if (first && t0 && first >= t0 && first - t0 < 10 * 60_000) perf.push({ ...current, kind: 'ttft', value: first - t0 })
   }
   for (const bucket of usage.values()) bucket.turns = turns.size
-  return { usage, timeline, turns: turns.size }
+  return { usage, timeline, perf, turns: turns.size }
 }
 
 const num = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : 0)
@@ -249,6 +289,7 @@ function withPromo(row, listCost) {
  */
 export function summarizeSessions(rows, root = sessionsRoot(), canonical, opts = {}) {
   const perModel = new Map() // "provider|model" -> aggregates
+  const perfObs = new Map() // route key -> {speed: [], ttft: []}, filled during the session loop
   const sessions = []
   // Calendar bounds: the window drops stale sessions entirely; "this month" is
   // a reporting slice inside whatever the window kept. Local time on purpose —
@@ -302,6 +343,12 @@ export function summarizeSessions(rows, root = sessionsRoot(), canonical, opts =
       parts.push(part)
     }
     if (!parts.length) continue
+    for (const p of replay.perf) {
+      const pk = `${p.provider}\u0000${p.model}`
+      let obs = perfObs.get(pk)
+      if (!obs) perfObs.set(pk, (obs = { speed: [], ttft: [] }))
+      if (obs[p.kind].length < 500) obs[p.kind].push(p.value) // cap per-route samples
+    }
     const leaks = attributeLeaks(replay.timeline, rows, canonical)
     sessions.push({
       leaks,
@@ -330,8 +377,17 @@ export function summarizeSessions(rows, root = sessionsRoot(), canonical, opts =
   )
   const models = [...perModel.values()]
     .map((m) => {
+      const pk = `${m.provider}\u0000${m.model}`
+      const obs = perfObs.get(pk) ?? { speed: [], ttft: [] }
+      const p50 = (arr) => { if (!arr.length) return null; const s = arr.slice().sort((a, b) => a - b); return s[Math.floor(s.length / 2)] }
+      const ttft = p50(obs.ttft)
+      const speed = p50(obs.speed)
       const resolution = resolveRows(rows, canonical, m.provider, m.model)
       const out = { provider: m.provider, model: m.model, input: m.input, output: m.output, cacheRead: m.cacheRead, sessions: m.sessions }
+      if (ttft != null) out.ttftP50Ms = Math.round(ttft)
+      if (ttft != null) out.ttftN = obs.ttft.length
+      if (speed != null) out.tokPerS = Math.round(speed * 10) / 10
+      if (speed != null) out.speedN = obs.speed.length
       out.confidence = resolution.kind
       if (resolution.kind === 'estimated') {
         // Range only: the configured provider matched no single listing.
@@ -343,6 +399,7 @@ export function summarizeSessions(rows, root = sessionsRoot(), canonical, opts =
         out.listUsd = round(list)
         out.actualUsd = round(cost)
         out.savedUsd = round(saved)
+        out.outPrice = priceOf(resolution.row, 'output') // $/1M out, list, for the perf quadrant
       }
       return out
     })
