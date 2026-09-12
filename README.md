@@ -12,6 +12,7 @@ cache is silently losing.
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
 [![stars](https://img.shields.io/github/stars/vitas/dsh-model-pricing?style=social)](https://github.com/vitas/dsh-model-pricing)
 [![dsh plugin](https://img.shields.io/badge/dsh--plugin-ready-informational)](https://github.com/deepseek-ai/deepseek-harness)
+[![awesome-dsh-plugin](https://img.shields.io/badge/awesome--dsh--plugin-listed-blueviolet)](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin)
 
 ![dsh-model-pricing pricing table rendered in the DSH Models settings page](assets/screenshot.png)
 
@@ -108,9 +109,9 @@ a source URL and an expiry. Code contributions should follow
 [docs/architecture.md](docs/architecture.md) (package layout, CI expectations).
 
 This plugin is listed in
-[awesome-dsh-plugin](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin) *(submission
-in progress)* and installable alongside the other community plugins through
-`dsh plugin add`.
+[awesome-dsh-plugin](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin)
+(accepted 2026-09-11) and installable alongside the other community plugins
+through `dsh plugin add`.
 
 If this saved you a tab-switch, **[a star](https://github.com/vitas/dsh-model-pricing)
 helps other people find it.**
