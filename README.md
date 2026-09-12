@@ -19,6 +19,11 @@ cache is silently losing.
 *The pricing table in the DSH **Settings → Models** page: cross-provider
 `lowest listed` badges, capability tags, and per-1M-token prices.*
 
+![dsh-model-pricing session costs panel: spend per workspace, cache-leak attribution and the route performance quadrant](assets/screenshot-sessions.png)
+
+*The session costs panel: per-workspace spend by the route actually called, cache
+leaks by cause, and a price × speed quadrant measured from your own history.*
+
 ## Why
 
 Choosing a coding agent model today means opening three browser tabs: your provider's
@@ -50,6 +55,10 @@ your own machine.
   input price instead of cached price, split by cause — idle gaps past documented
   provider TTLs, route switches, unattributed — and never charging compaction, which
   is the opposite of a leak
+- **Route performance quadrant**: time-to-first-token and tokens/second per
+  (provider, model), medians over your own window — paired with the list price, so
+  “cheap & slow” is a fact about your history, not a blog post; five samples or
+  more before anything is labelled
 - English, Chinese and Russian UI, parity-checked in CI
 
 Planned next: badges inside provider cards, a `/pricing` command, and cost

@@ -98,9 +98,9 @@ Releases: v0.1 = Epics A + E; v0.2 = Epic B (automatic part) + Epic C; v0.3 = Ep
 | D3 | Window, grouping, month | shipped (unreleased): `sessionWindowDays` setting (default 30), per-workspace subtotals, current-month total on the local calendar; compaction-safe |
 | D4 | Projection before compaction | deferred — needs the `contextPressure` seam (related open question Q5) |
 | D5 | Cache-leak attribution | shipped (unreleased): history re-billed at full input price beyond genuine context growth = leak; causes ordered `switch > ttl (documented provider TTL only) > other`; shrunk contexts (compaction) are never charged; undocumented TTLs fold into `other` rather than being invented; only price-resolvable routes count |
-| D6 | Leak panel | shipped (unreleased): warn-toned total + split with full-policy tooltip above the session table; hides below $0.005 |
-| D7 | Route performance | shipped (unreleased): TTFT (first stream chunk − `step/start`) and tok/s (output tokens ÷ step duration) per route from the same replay; stream chunk times are delta-encoded (`time0`) — rebuilt against the last absolute event and clamped to the owning step window; `request/context` fires per TURN, never per step, so it cannot anchor TTFT (measured, twice) |
-| D8 | Quadrant table | shipped (unreleased): model @provider · TTFT P50 · tok/s · $/M out (list, resolved price only) · quadrant chip vs window medians; <5 samples = no chip; tooltips carry sample counts |
+| D6 | Leak panel | shipped (0.4.0): warn-toned total + split with full-policy tooltip above the session table; hides below $0.005 |
+| D7 | Route performance | shipped (0.5.0): TTFT (first stream chunk − `step/start`) and tok/s (output tokens ÷ step duration) per route from the same replay; stream chunk times are delta-encoded (`time0`) — rebuilt against the last absolute event and clamped to the owning step window; `request/context` fires per TURN, never per step, so it cannot anchor TTFT (measured, twice) |
+| D8 | Quadrant table | shipped (0.5.0): model @provider · TTFT P50 · tok/s · $/M out (list, resolved price only) · quadrant chip vs window medians; <5 samples = no chip; tooltips carry sample counts |
 
 ### Epic E — Infrastructure (P0)
 

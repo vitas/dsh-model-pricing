@@ -1,6 +1,6 @@
 {
   "name": "dsh-model-pricing",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Model pricing and capability board for DeepSeek Harness: compare per-1M-token prices, find the cheapest route, and see coding/agentic/vision tags for every LLM you can connect — in the DSH settings UI.",
   "type": "module",
   "license": "Apache-2.0",

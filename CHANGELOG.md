@@ -4,7 +4,7 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow
 semantic versioning.
 
-## [Unreleased]
+## [0.5.0] - 2026-09-12
 
 ### Added
 - **Route performance intelligence (Epic D7–D8)**: per-(provider, model) medians of
