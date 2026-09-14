@@ -5,7 +5,7 @@
     "fixedCost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
     "until": "2026-10-10",
     "url": "https://docs.b.ai/llmservice/promotions-and-pricing-notices/",
-    "verifiedAt": "2026-09-12",
+    "verifiedAt": "2026-09-14",
     "by": "vitas (official docs)"
   },
   {
@@ -14,7 +14,7 @@
     "fixedCost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
     "until": "2026-10-10",
     "url": "https://docs.b.ai/llmservice/promotions-and-pricing-notices/",
-    "verifiedAt": "2026-09-12",
+    "verifiedAt": "2026-09-14",
     "by": "vitas (official docs)"
   },
   {
@@ -23,7 +23,7 @@
     "fixedCost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
     "until": "2026-10-10",
     "url": "https://docs.b.ai/llmservice/promotions-and-pricing-notices/",
-    "verifiedAt": "2026-09-12",
+    "verifiedAt": "2026-09-14",
     "by": "vitas (official docs)"
   },
   {
@@ -32,7 +32,7 @@
     "discountPct": 90,
     "until": "2026-10-10",
     "url": "https://docs.b.ai/llmservice/promotions-and-pricing-notices/",
-    "verifiedAt": "2026-09-12",
+    "verifiedAt": "2026-09-14",
     "by": "vitas (official docs)"
   },
   {
@@ -41,7 +41,7 @@
     "discountPct": 90,
     "until": "2026-10-10",
     "url": "https://docs.b.ai/llmservice/promotions-and-pricing-notices/",
-    "verifiedAt": "2026-09-12",
+    "verifiedAt": "2026-09-14",
     "by": "vitas (official docs)"
   },
   {
@@ -50,7 +50,7 @@
     "discountPct": 40,
     "until": "2026-10-10",
     "url": "https://docs.b.ai/llmservice/promotions-and-pricing-notices/",
-    "verifiedAt": "2026-09-12",
+    "verifiedAt": "2026-09-14",
     "by": "vitas (official docs)"
   },
   {
@@ -59,7 +59,7 @@
     "discountPct": 10,
     "until": "2026-10-10",
     "url": "https://docs.b.ai/llmservice/promotions-and-pricing-notices/",
-    "verifiedAt": "2026-09-12",
+    "verifiedAt": "2026-09-14",
     "by": "vitas (official docs)"
   }
 ]
