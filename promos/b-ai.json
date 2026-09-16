@@ -1,30 +1,30 @@
 [
   {
     "model": "qwen3.8-flash",
-    "promo": "Qwen3.8-Flash API at 0 Credits (free); chat free on launch. End not announced",
-    "fixedCost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
+    "promo": "Qwen3.8-Flash billed at 10% of standard price from 2026-09-16 17:00 SGT (free API before that). End not announced",
     "until": "2026-10-10",
     "url": "https://docs.b.ai/llmservice/promotions-and-pricing-notices/",
-    "verifiedAt": "2026-09-14",
-    "by": "vitas (official docs)"
+    "verifiedAt": "2026-09-16",
+    "by": "vitas (official docs)",
+    "discountPct": 90
   },
   {
     "model": "hy3",
-    "promo": "Hy3 at 0 Credits on API and chat since 2026-08-21; reverts to standard pricing after. End not announced",
-    "fixedCost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
+    "promo": "Hy3 billed at 10% of standard price from 2026-09-16 17:00 SGT (free since 2026-08-21 before that). End not announced",
     "until": "2026-10-10",
     "url": "https://docs.b.ai/llmservice/promotions-and-pricing-notices/",
-    "verifiedAt": "2026-09-14",
-    "by": "vitas (official docs)"
+    "verifiedAt": "2026-09-16",
+    "by": "vitas (official docs)",
+    "discountPct": 90
   },
   {
     "model": "mimo-v2.5",
-    "promo": "MiMo-V2.5 API free (0 Credits) since 2026-08-24, chat since 2026-08-25. End not announced",
-    "fixedCost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
+    "promo": "MiMo-V2.5 billed at 10% of standard price from 2026-09-16 17:00 SGT (free before that). End not announced",
     "until": "2026-10-10",
     "url": "https://docs.b.ai/llmservice/promotions-and-pricing-notices/",
-    "verifiedAt": "2026-09-14",
-    "by": "vitas (official docs)"
+    "verifiedAt": "2026-09-16",
+    "by": "vitas (official docs)",
+    "discountPct": 90
   },
   {
     "model": "glm-5.3-flash",
@@ -32,7 +32,7 @@
     "discountPct": 90,
     "until": "2026-10-10",
     "url": "https://docs.b.ai/llmservice/promotions-and-pricing-notices/",
-    "verifiedAt": "2026-09-14",
+    "verifiedAt": "2026-09-16",
     "by": "vitas (official docs)"
   },
   {
@@ -41,7 +41,7 @@
     "discountPct": 90,
     "until": "2026-10-10",
     "url": "https://docs.b.ai/llmservice/promotions-and-pricing-notices/",
-    "verifiedAt": "2026-09-14",
+    "verifiedAt": "2026-09-16",
     "by": "vitas (official docs)"
   },
   {
@@ -50,7 +50,7 @@
     "discountPct": 40,
     "until": "2026-10-10",
     "url": "https://docs.b.ai/llmservice/promotions-and-pricing-notices/",
-    "verifiedAt": "2026-09-14",
+    "verifiedAt": "2026-09-16",
     "by": "vitas (official docs)"
   },
   {
@@ -59,7 +59,7 @@
     "discountPct": 10,
     "until": "2026-10-10",
     "url": "https://docs.b.ai/llmservice/promotions-and-pricing-notices/",
-    "verifiedAt": "2026-09-14",
+    "verifiedAt": "2026-09-16",
     "by": "vitas (official docs)"
   }
 ]
