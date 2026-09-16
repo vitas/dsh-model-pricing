@@ -1,0 +1,76 @@
+{
+  "generatedAt": "2026-09-16T09:12:32.366Z",
+  "count": 7,
+  "promos": [
+    {
+      "provider": "b-ai",
+      "model": "qwen3.8-flash",
+      "promo": "Qwen3.8-Flash billed at 10% of standard price from 2026-09-16 17:00 SGT (free API before that). End not announced",
+      "until": "2026-10-10",
+      "url": "https://docs.b.ai/llmservice/promotions-and-pricing-notices/",
+      "verifiedAt": "2026-09-16",
+      "by": "vitas (official docs)",
+      "discountPct": 90
+    },
+    {
+      "provider": "b-ai",
+      "model": "hy3",
+      "promo": "Hy3 billed at 10% of standard price from 2026-09-16 17:00 SGT (free since 2026-08-21 before that). End not announced",
+      "until": "2026-10-10",
+      "url": "https://docs.b.ai/llmservice/promotions-and-pricing-notices/",
+      "verifiedAt": "2026-09-16",
+      "by": "vitas (official docs)",
+      "discountPct": 90
+    },
+    {
+      "provider": "b-ai",
+      "model": "mimo-v2.5",
+      "promo": "MiMo-V2.5 billed at 10% of standard price from 2026-09-16 17:00 SGT (free before that). End not announced",
+      "until": "2026-10-10",
+      "url": "https://docs.b.ai/llmservice/promotions-and-pricing-notices/",
+      "verifiedAt": "2026-09-16",
+      "by": "vitas (official docs)",
+      "discountPct": 90
+    },
+    {
+      "provider": "b-ai",
+      "model": "glm-5.3-flash",
+      "promo": "GLM-5.3-Flash discounted to as low as 10% of standard price from 2026-09-12 (replaces the earlier free offer). End not announced",
+      "discountPct": 90,
+      "until": "2026-10-10",
+      "url": "https://docs.b.ai/llmservice/promotions-and-pricing-notices/",
+      "verifiedAt": "2026-09-16",
+      "by": "vitas (official docs)"
+    },
+    {
+      "provider": "b-ai",
+      "model": "deepseek-v4.1-flash",
+      "promo": "DeepSeek-V4.1-Flash at 10% of standard price from 2026-09-12, tracking DeepSeek's idle/busy time-based pricing. End not announced",
+      "discountPct": 90,
+      "until": "2026-10-10",
+      "url": "https://docs.b.ai/llmservice/promotions-and-pricing-notices/",
+      "verifiedAt": "2026-09-16",
+      "by": "vitas (official docs)"
+    },
+    {
+      "provider": "b-ai",
+      "model": "glm-5.2",
+      "promo": "GLM-5.2 billed at 60% of standard reference price (API and web). End not announced",
+      "discountPct": 40,
+      "until": "2026-10-10",
+      "url": "https://docs.b.ai/llmservice/promotions-and-pricing-notices/",
+      "verifiedAt": "2026-09-16",
+      "by": "vitas (official docs)"
+    },
+    {
+      "provider": "b-ai",
+      "model": "glm-5.3",
+      "promo": "GLM-5.3 billed at 90% of standard reference price (API and web). End not announced",
+      "discountPct": 10,
+      "until": "2026-10-10",
+      "url": "https://docs.b.ai/llmservice/promotions-and-pricing-notices/",
+      "verifiedAt": "2026-09-16",
+      "by": "vitas (official docs)"
+    }
+  ]
+}
