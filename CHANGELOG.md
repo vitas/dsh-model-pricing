@@ -4,6 +4,41 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow
 semantic versioning.
 
+## [0.6.0] - 2026-09-30
+
+Supports both settings models: DSH 0.1.7 and 0.2.0 (Plugins row pages) and DSH
+0.1.5 (the `model-pricing` page under Settings). No configuration change is
+needed on any version — the same `cordis.patch.yml` entry keeps working.
+
+### Added
+
+- Row-configuration page for DSH 0.1.7+, which replaced `settings.plugin.item`
+  with the keyed `plugins.row.config` slot. A row's own `Config` is its settings
+  section there, so the form is registered against
+  `dsh-model-pricing#dsh-model-pricing`.
+- `src/shared/config.mjs` — the single place both halves read the package name,
+  row id, and settings namespaces from, so the host and the browser cannot
+  disagree about which entry they own.
+- Optional `heading` prop on the settings card: the 0.1.7+ row page draws the
+  title and crumb around the form itself, so the card drops its own there.
+
+### Fixed
+
+- **DSH 0.1.7+: the configuration card is reachable again.** The entry was
+  missing from the Plugins page entirely — no Configure control and no namespace
+  — because it is the *volatile* part of a `Config` schema that 0.1.7 projects a
+  form from. Every field is now marked `.volatile()`, which is inert on 0.1.5,
+  whose `schemastery` (3.18.2) has no such method.
+- **DSH 0.1.7+: the configured source URL, TTL, and tag rules reach the catalog
+  again.** 0.1.7 hands each volatile field to `apply` as a live accessor
+  (`config.sourceUrl.get()`) rather than a value. Read as a scalar it looks like
+  an absent field, so the plugin silently fell back to its constants —
+  models.dev and a 6-hour TTL — whatever the patch or the form said.
+- **Provider price badges survive the move.** They were registered only inside
+  the `settingsScope` path, so on 0.1.7+ they would have disappeared along with
+  the section. Both settings models expose the same describe mirror, and the
+  badges now read from whichever one is present.
+
 ## [0.5.0] - 2026-09-12
 
 ### Added

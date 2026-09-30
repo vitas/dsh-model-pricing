@@ -106,8 +106,14 @@ function Field(props: {
   )
 }
 
-/** The card body; the bound scope arrives via closure from apply(). */
-export function PricingSettingsCard(props: { scope: PricingScope }) {
+/**
+ * The card body; the bound scope arrives via closure from apply().
+ *
+ * `heading: false` drops the card's own title and subtitle, for hosts that draw
+ * the title, icon, and crumb around the form themselves — DSH 0.1.7's plugin
+ * row page does. The 0.1.5 Plugins settings tab does not, so it keeps them.
+ */
+export function PricingSettingsCard(props: { scope: PricingScope; heading?: boolean }) {
   const snap = useSyncExternalStore(
     (cb) => props.scope.subscribe(cb),
     () => props.scope.getSnapshot(),
@@ -153,8 +159,12 @@ export function PricingSettingsCard(props: { scope: PricingScope }) {
         background: 'var(--dsw-alias-bg-secondary, transparent)',
       }}
     >
-      <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 2 }}>{tr('title')}</div>
-      <div style={{ ...hintStyle, marginBottom: 12 }}>{tr('settingsHint')}</div>
+      {props.heading === false ? null : (
+        <>
+          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 2 }}>{tr('title')}</div>
+          <div style={{ ...hintStyle, marginBottom: 12 }}>{tr('settingsHint')}</div>
+        </>
+      )}
       <Field
         id="model-pricing-ttl"
         label={tr('ttlField')}

@@ -24,10 +24,11 @@ import {
   fetchPromoFeed,
   pruneModelsDev,
 } from './catalog.js'
+import { PLUGIN_NAME, SETTINGS_NAMESPACE } from '../shared/config.mjs'
 import { sessionsRoot, summarizeSessions } from './sessions.js'
 
 
-const PLUGIN_ID = 'dsh-model-pricing'
+const PLUGIN_ID = PLUGIN_NAME
 const ROUTE_SNAPSHOT = '/model-pricing/snapshot'
 const ROUTE_REFRESH = '/model-pricing/refresh'
 const ROUTE_SESSIONS = '/model-pricing/sessions'
@@ -116,17 +117,115 @@ function etagOf(payload) {
   return `"${createHash('sha256').update(JSON.stringify(payload)).digest('base64').slice(0, 16)}"`
 }
 
+/**
+ * Build a settings schema, optionally marking every field volatile.
+ *
+ * `.volatile()` is what tells DSH 0.1.7 which fields belong to a row's settings
+ * form: its settings service projects the form from the volatile part of a
+ * `Config` schema only (`volatileForm` in dsh-settings) and refuses writes that
+ * do not lie beneath a volatile node. A schema with no volatile field is
+ * invisible to the Plugins page — the entry is dropped from `describe`, no
+ * namespace is served, and every user override is silently rejected.
+ *
+ * The marker is NOT free: a volatile field resolves from outside the local
+ * document, so a bare schemastery call such as `schema({})` yields nothing for
+ * it. The imperative `installSection` path below resolves the section that way,
+ * so it keeps the plain schema and both versions behave as they always did.
+ *
+ * `tagRules` is `z.any()`; verified against schemastery 3.18.4 that `z.any()`
+ * has `.volatile()` and that its `toJSON()` round-trips through the volatile
+ * form projection, so it carries the marker like every other field.
+ *
+ * @param z - the schemastery module.
+ * @param volatile - mark every field `.volatile()`.
+ * @returns the object schema.
+ */
+function makeSchema(z, volatile) {
+  /** Apply the volatile marker where the schema type supports it. */
+  const mark = (schema) => (volatile && typeof schema.volatile === 'function' ? schema.volatile() : schema)
+  return z.object({
+    sourceUrl: mark(z.string().default(DEFAULT_SOURCE_URL)),
+    promoFeedUrl: mark(z.string().default(DEFAULT_PROMO_URL)),
+    ttlMinutes: mark(z.number().default(Math.round(DEFAULT_TTL_MS / 60_000))),
+    sessionWindowDays: mark(z.number().default(30)),
+    tagRules: mark(z.any()),
+  })
+}
+
+/**
+ * The two schemas, built once. Absent when schemastery does not resolve — a bare
+ * development checkout without the peer still composes, with the composition
+ * entry as the only configuration source.
+ *
+ * @returns `{ settings, config }`: the plain schema the imperative 0.1.5 path
+ *   registers, and the volatile one the loader exposes as this row's `Config`.
+ */
+async function buildSchemas() {
+  try {
+    const { default: z } = await import('@deepseek-ai/schemastery')
+    return { settings: makeSchema(z, false), config: makeSchema(z, true) }
+  } catch {
+    return { settings: undefined, config: undefined }
+  }
+}
+
+/**
+ * The row's Config schema, which the loader applies to `config` before `apply`.
+ *
+ * DSH 0.1.7 dropped `ctx.settings.installSection` and made a plugin's settings
+ * section the Config of its own Loader row: the loader validates the row's
+ * configuration against this export, and the settings service projects it into a
+ * form the Plugins page renders. Without it a row has no schema, so the settings
+ * service has no section for it and every user override is rejected — the plugin
+ * silently keeps the composition entry's values.
+ *
+ * 0.1.5 has no such convention, so `apply` below still registers the same fields
+ * imperatively and both versions stay configured. Cordis treats a missing Config
+ * as "no schema", so the peer-less checkout composes exactly as it did before.
+ */
+const SCHEMAS = await buildSchemas()
+
+/** The volatile schema the loader exposes as this row's Config. */
+export const Config = SCHEMAS.config
+
 export const name = PLUGIN_ID
 export const inject = []
 
-/** Settings namespace the plugin registers with DSH's settings service. */
-const SETTINGS_NS = 'model-pricing'
+/**
+ * Read one resolved config field.
+ *
+ * DSH 0.1.7 hands a volatile field over as a live accessor rather than a value.
+ * Reading that accessor as a scalar yields the accessor object itself, which
+ * then looks like an absent field, so every row silently falls back to the
+ * schema defaults and the user's own configuration never reaches the catalog —
+ * which is exactly what happened to this plugin before the unwrapping was added.
+ * 0.1.5 hands over plain values, so this is a no-op there. Reading through the
+ * accessor on every call is also what makes a settings edit reach the next
+ * catalog build without a restart.
+ *
+ * @param value - one field of the loader-resolved config.
+ * @returns the current value behind it.
+ */
+function readField(value) {
+  return value !== null && typeof value === 'object' && typeof value.get === 'function' ? value.get() : value
+}
+
+/** Project a whole resolved config through {@link readField}. */
+function readConfig(config) {
+  if (config === null || typeof config !== 'object') return {}
+  return Object.fromEntries(Object.entries(config).map(([key, value]) => [key, readField(value)]))
+}
 
 /**
  * Coerce a raw config object (composition entry or resolved settings section)
  * into the effective values the catalog pipeline consumes.
+ *
+ * Every field is read through {@link readConfig} first, so the same function
+ * serves the 0.1.7 loader (live accessors), the 0.1.5 settings section (plain
+ * values) and the composition entry.
  */
-function normalizeSettings(raw = {}) {
+function normalizeSettings(input = {}) {
+  const raw = readConfig(input)
   return {
     sourceUrl: typeof raw.sourceUrl === 'string' && raw.sourceUrl ? raw.sourceUrl : DEFAULT_SOURCE_URL,
     ttlMs: Number.isFinite(raw.ttlMinutes) && raw.ttlMinutes > 0 ? raw.ttlMinutes * 60_000 : DEFAULT_TTL_MS,
@@ -139,73 +238,84 @@ function normalizeSettings(raw = {}) {
 
 /**
  * Plugin entry. Reads optional config, wires the catalog cache, and registers the
- * two routes through DSH's webServer seam.
+ * routes through DSH's webServer seam.
+ *
+ * Live configuration: on 0.1.7 the loader validates the row against {@link Config}
+ * and hands the volatile fields over as live accessors, so `config` is re-read on
+ * every catalog build and a settings edit needs no restart. On 0.1.5 the section
+ * is registered imperatively below and `setSource` supplies the same freshness.
+ * Catalog-affecting fields trigger a rebuild on the next request; the TTL applies
+ * immediately. Without a settings service (or schemastery in a bare dev
+ * environment) the composition entry stays authoritative.
+ *
  * @param ctx - Host cordis context.
- * @param config - profile patch config (`ttlMinutes`, `sourceUrl`, `tagRules`).
+ * @param config - the row's config, already resolved by the loader against
+ *   {@link Config} (`ttlMinutes`, `sourceUrl`, `tagRules`, …); volatile fields
+ *   arrive as accessors and are read through {@link readConfig}.
  */
 export async function apply(ctx, config = {}) {
-  /** Effective configuration: composition entry until the settings service attaches. */
-  let settings = normalizeSettings(config)
-  /** Key of the config the current snapshot was built from (catalog-affecting fields). */
-  let builtKey = JSON.stringify({ sourceUrl: settings.sourceUrl, tagRules: settings.tagRules ?? null, promoFeedUrl: settings.promoFeedUrl })
-
   /**
-   * Live configuration via DSH's settings service (E3). The namespace mirrors the
-   * composition entry as its base layer; user edits in settings.yaml win and take
-   * effect without a restart — catalog-affecting fields trigger a rebuild on the
-   * next request, TTL applies immediately. Without the service (or schemastery in
-   * a bare dev environment) the plugin keeps working exactly as composed.
+   * Effective configuration, read fresh on every use so a live settings edit
+   * applies without a restart. On 0.1.7 the loader commits a volatile-only edit
+   * by writing into the accessors it already handed over — `apply` is not re-run
+   * — so caching a normalized snapshot here would freeze the first values. On
+   * 0.1.5 the registration below swaps in the section's own source.
    */
+  let effective = () => normalizeSettings(config)
+  /** Key of the catalog-affecting fields a snapshot was built from. */
+  const catalogKey = (s) => JSON.stringify({ sourceUrl: s.sourceUrl, tagRules: s.tagRules ?? null, promoFeedUrl: s.promoFeedUrl })
+  let builtKey = catalogKey(effective())
+
   /** @type {{ payload: object, etag: string, fetchedAt: number, fromCache: boolean } | null} */
   let snapshot = null
   let inflight = null
 
-  try {
-    const { default: z } = await import('@deepseek-ai/schemastery')
-    const schema = z.object({
-      sourceUrl: z.string().default(DEFAULT_SOURCE_URL),
-      promoFeedUrl: z.string().default(DEFAULT_PROMO_URL),
-      ttlMinutes: z.number().default(Math.round(DEFAULT_TTL_MS / 60_000)),
-      sessionWindowDays: z.number().default(30),
-      tagRules: z.any(),
-    })
-    ctx.inject(['settings'], (c) => {
+  // DSH 0.1.5 registers the section imperatively; 0.1.7 replaced that seam (a
+  // plugin's settings section is now its own Loader row's Config, which the
+  // loader already applied to `config` above), so the missing method is the
+  // signal to stop. Uses the PLAIN schema: a volatile one validates to an
+  // accessor object, which the imperative path resolves as a bare
+  // `schema(config)` document and would break.
+  ctx.inject(['settings'], (c) => {
+    if (typeof c.settings?.installSection !== 'function') return
+    if (SCHEMAS.settings === undefined) return
+    try {
       let source = () => config
-      c.settings.installSection(ctx, SETTINGS_NS, schema, config, {
-        setSource: (current) => {
-          source = current
+      effective = () => normalizeSettings(source())
+      c.settings.installSection(ctx, SETTINGS_NAMESPACE, SCHEMAS.settings, config, {
+        setSource: (next) => {
+          source = next
         },
         onChange: () => {
-          const next = normalizeSettings(source())
-          settings = next
-          const nextKey = JSON.stringify({ sourceUrl: next.sourceUrl, tagRules: next.tagRules ?? null, promoFeedUrl: next.promoFeedUrl })
-          if (nextKey !== builtKey) snapshot = null // forces a rebuild on the next request
+          if (catalogKey(effective()) !== builtKey) snapshot = null // forces a rebuild on the next request
         },
       })
-    })
-  } catch {
-    // schemastery or the settings seam unavailable — entry config stays authoritative
-  }
+    } catch {
+      // The composition entry stays authoritative and every other surface keeps
+      // working — a settings registration must never take the catalog down.
+    }
+  })
 
   async function build() {
+    const live = effective()
     // The catalog is required; the promotion feed is best-effort (fetchPromoFeed
     // never throws). They are independent, so they load concurrently.
     const [doc, promos] = await Promise.all([
-      fetchModelsDev(settings.sourceUrl),
-      fetchPromoFeed(settings.promoFeedUrl),
+      fetchModelsDev(live.sourceUrl),
+      fetchPromoFeed(live.promoFeedUrl),
     ])
-    const { rows, stats } = pruneModelsDev(doc, settings.tagRules)
+    const { rows, stats } = pruneModelsDev(doc, live.tagRules)
     const pi = await loadPiAiCatalog()
     mergePiAi(rows, pi)
     annotateComparisons(rows)
     const promoResult = attachPromos(rows, promos)
     stats.promotions = promoResult.matched
-    builtKey = JSON.stringify({ sourceUrl: settings.sourceUrl, tagRules: settings.tagRules ?? null, promoFeedUrl: settings.promoFeedUrl })
+    builtKey = catalogKey(live)
     const payload = {
       generatedAt: new Date().toISOString(),
-      ttlSeconds: Math.round(settings.ttlMs / 1000),
-      source: { name: 'models.dev', url: settings.sourceUrl },
-      promotions: { source: settings.promoFeedUrl || null, count: stats.promotions, providerOffers: promoResult.providerOffers },
+      ttlSeconds: Math.round(live.ttlMs / 1000),
+      source: { name: 'models.dev', url: live.sourceUrl },
+      promotions: { source: live.promoFeedUrl || null, count: stats.promotions, providerOffers: promoResult.providerOffers },
       stats,
       providers: { configured: configuredProviders() },
       rows,
@@ -227,7 +337,7 @@ export async function apply(ctx, config = {}) {
   }
 
   function stale() {
-    return snapshot === null || Date.now() - snapshot.fetchedAt > settings.ttlMs
+    return snapshot === null || Date.now() - snapshot.fetchedAt > effective().ttlMs
   }
 
   /** Disk cache location: under DSH_HOME when set, else `~/.dsh`, else temp. */
@@ -342,12 +452,13 @@ export async function apply(ctx, config = {}) {
       path: ROUTE_SESSIONS,
       handler: async (req, res) => {
         try {
-          if (!sessionsCache || sessionsCache.window !== settings.sessionWindowDays || Date.now() - sessionsCache.at > 60_000) {
+          const window = effective().sessionWindowDays
+          if (!sessionsCache || sessionsCache.window !== window || Date.now() - sessionsCache.at > 60_000) {
             const snap = await current(false)
             sessionsCache = {
               at: Date.now(),
-              window: settings.sessionWindowDays,
-              data: summarizeSessions(snap.payload.rows, sessionsRoot(), canonicalModelId, { windowDays: settings.sessionWindowDays }),
+              window,
+              data: summarizeSessions(snap.payload.rows, sessionsRoot(), canonicalModelId, { windowDays: window }),
             }
           }
           sendJson(res, 200, JSON.stringify(sessionsCache.data), undefined, req)
